@@ -1,4 +1,0 @@
-## SECTION=image
-
-config IMAGE_KERNEL
-	bool
