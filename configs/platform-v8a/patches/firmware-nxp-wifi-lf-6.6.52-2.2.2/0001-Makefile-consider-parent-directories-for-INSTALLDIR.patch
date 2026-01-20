@@ -1,0 +1,27 @@
+From: Fabian Pfitzner <f.pfitzner@pengutronix.de>
+Date: Mon, 12 Jan 2026 16:24:23 +0100
+Subject: [PATCH] Makefile: consider parent directories for INSTALLDIR
+
+If INSTALLDIR contains more than one level of directories (e. g.
+"/lib/firmware/nxp"), it fails creating them.
+
+Add "-p" to mkdir in order to allow the creation of multiple directories.
+
+Signed-off-by: Fabian Pfitzner <f.pfitzner@pengutronix.de>
+---
+ Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index 8dff9dcd4a26..0f3b56712fa0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -21,7 +21,7 @@ INSTALLDIR ?= wlan_fw
+ install:
+ 
+ 	@if [ ! -d $(INSTALLDIR) ]; then \
+-		mkdir $(INSTALLDIR); \
++		mkdir -p $(INSTALLDIR); \
+ 	fi
+ 
+ 	install -m 0644 nxp/wifi_mod_para.conf $(INSTALLDIR)/

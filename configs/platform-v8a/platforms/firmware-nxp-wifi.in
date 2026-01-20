@@ -1,0 +1,7 @@
+## SECTION=non_free_firmware
+
+config FIRMWARE_NXP_WIFI
+	tristate
+	prompt "firmware-nxp-wifi"
+	help
+	  Install NXP WiFi firmware
