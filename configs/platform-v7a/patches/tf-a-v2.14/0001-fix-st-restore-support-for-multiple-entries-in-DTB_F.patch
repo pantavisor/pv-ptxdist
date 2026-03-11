@@ -1,0 +1,58 @@
+From: Ahmad Fatoum <a.fatoum@pengutronix.de>
+Date: Mon, 2 Feb 2026 16:49:02 +0100
+Subject: [PATCH] fix(st): restore support for multiple entries in
+ DTB_FILE_NAME
+
+Commit e772a6d1864a ("stm32mp1: platform.mk: support generating multiple
+images in one build") allowed DTB_FILE_NAME to contain multiple entries,
+thereby allowing to build all the executable code once and then link it
+against each device tree one by one.
+
+This makes for easier build system integration as one recipe/package can
+generate multiple images at once.
+
+This was broken by below mentioned commit, because it assumed
+DTB_FILE_NAME to contain only a single entry. Rework the -sp_min suffix
+logic to fix this regression.
+
+Fixes: 71ba1647e09c ("feat(st): use dedicated version of DT for SP_MIN")
+Change-Id: Ib596a404ccda92c3a3c29e276930a74f147734fc
+Signed-off-by: Ahmad Fatoum <a.fatoum@pengutronix.de>
+Upstream-Status: Submitted; https://review.trustedfirmware.org/c/TF-A/trusted-firmware-a/+/47888
+---
+ plat/st/stm32mp1/platform.mk | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/plat/st/stm32mp1/platform.mk b/plat/st/stm32mp1/platform.mk
+index 96856f88ba3a..8cb5e41a0488 100644
+--- a/plat/st/stm32mp1/platform.mk
++++ b/plat/st/stm32mp1/platform.mk
+@@ -109,14 +109,14 @@ FDT_SOURCES		:=	$(addprefix ${BUILD_PLAT}/fdts/, $(patsubst %.dtb,%-bl2.dts,$(DT
+ ifeq ($(AARCH32_SP),sp_min)
+ BL32_DTSI		:=	stm32mp15-bl32.dtsi
+ FDT_SOURCES		+=	$(addprefix ${BUILD_PLAT}/fdts/, $(patsubst %.dtb,%-bl32.dts,$(DTB_FILE_NAME)))
+-ifneq (,$(wildcard $(patsubst %.dtb,fdts/%-sp_min.dts,$(DTB_FILE_NAME))))
+-ifeq (,$(findstring -sp_min,$(DTB_FILE_NAME)))
+-SP_EXT			:=	-sp_min
+-endif
+-endif
+ endif
+ endif
+ 
++sp_dts_name = $(patsubst %.dts,%$(if $(and \
++    $(wildcard $(patsubst %.dts,fdts/%-sp_min.dts,$(notdir $(1)))), \
++    $(filter-out %-sp_min.dts,$(notdir $(1))) \
++  ),-sp_min).dts,$(notdir $(1)))
++
+ # Macros and rules to build TF binary
+ STM32_TF_STM32		:=	$(addprefix ${BUILD_PLAT}/tf-a-, $(patsubst %.dtb,%.stm32,$(DTB_FILE_NAME)))
+ STM32_LD_FILE		:=	plat/st/stm32mp1/stm32mp1.ld.S
+@@ -273,7 +273,7 @@ BL2_SOURCES		+=	plat/st/stm32mp1/plat_ddr.c
+ ifeq ($(AARCH32_SP),sp_min)
+ # Create DTB file for BL32
+ ${BUILD_PLAT}/fdts/%-bl32.dts: fdts/%.dts fdts/${BL32_DTSI} | $$(@D)/
+-	$(q)echo '#include "$(patsubst %.dts,%$(SP_EXT).dts,$(patsubst fdts/%,%,$<))"' > $@
++	$(q)echo '#include "$(call sp_dts_name,$(patsubst fdts/%,%,$<))"' > $@
+ 	$(q)echo '#include "${BL32_DTSI}"' >> $@
+ 
+ ${BUILD_PLAT}/fdts/%-bl32.dtb: ${BUILD_PLAT}/fdts/%-bl32.dts | $$(@D)/
