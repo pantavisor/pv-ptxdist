@@ -11,7 +11,11 @@
 #
 IMAGE_PACKAGES-$(PTXCONF_IMAGE_LXA_MC1_SCMI) += image-lxa-mc1-scmi
 
-IMAGE_LXA_MC1_SCMI_ENV := STM32MP_BOARD=stm32mp157c-lxa-mc1 SCMI=-scmi
+IMAGE_LXA_MC1_SCMI_ENV := \
+	STM32MP_BOARD=stm32mp157c-lxa-mc1 \
+	BAREBOX_DTB=stm32mp157c-lxa-mc1 \
+	BAREBOX_IMAGE=barebox-stm32mp-generic-bl33.img \
+	SCMI=-scmi
 
 #
 # Paths and names

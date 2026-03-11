@@ -1,0 +1,12 @@
+## SECTION=image
+
+config IMAGE_LXA_FAIRYTUX2
+	tristate
+	select HOST_GENIMAGE
+	select HOST_TF_A
+	select BAREBOX
+	select IMAGE_ROOT_EXT
+	select TF_A
+	prompt "Generate images/lxa-fairytux2.hdimg"
+	help
+	  Generate GPT image for the Linux Automation FairyTux 2
