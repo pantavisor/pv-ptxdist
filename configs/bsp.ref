@@ -46,15 +46,11 @@ barebox_oftree_fallback:
     for use in production as DT binding breakage is not an infrequent
     occurrence.
 
-    We take in DistroKit though to specify the DT when we specify a kernel,
-    so enable this option as it's occasionally helpful for quick debugging.
-  variants:
-    - condition: |
-        kconfig.have_barebox_config() and
-        (kconfig.BareboxConfig()['CONFIG_NAME'] == "multi_v7_defconfig" or
-        kconfig.BareboxConfig()['CONFIG_NAME'] == "multi_v8_defconfig")
-      value: False
-    - value: True
+    We take care in DistroKit though to specify the DT when we specify
+    a kernel, so enable this option as it's occasionally helpful for quick
+    debugging.
+  present:
+    - BOOTM_OFTREE_FALLBACK
 
 barebox_arm_optimized_string_functions:
   description: |
