@@ -49,6 +49,7 @@ barebox_oftree_fallback:
     We take care in DistroKit though to specify the DT when we specify
     a kernel, so enable this option as it's occasionally helpful for quick
     debugging.
+  condition: kconfig.have_barebox_config() and kconfig.BareboxConfig()['BOOTM_OFTREE']
   present:
     - BOOTM_OFTREE_FALLBACK
 
