@@ -26,7 +26,7 @@ IMAGE_TQ_MBA8MPXL_CONFIG	:= imx8m.config
 # ----------------------------------------------------------------------------
 
 IMAGE_TQ_MBA8MPXL_ENV := \
-        BAREBOX_IMAGE=barebox-tqma8mpxl.img
+        BAREBOX_IMAGE=barebox-tqma8mpxx.img
 
 $(IMAGE_TQ_MBA8MPXL_IMAGE):
 	@$(call targetinfo)
