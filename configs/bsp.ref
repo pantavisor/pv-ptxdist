@@ -32,12 +32,10 @@ kernel_dtb_partitions:
 
 kernel_initrd:
   description: |
-    Initrd support is not needed on most embedded systems.
-    For v7a and v8a, we use an initrd for the fastboot usecase.
+    As most new projects require a initrd for secure-boot purposes, we want the
+    kernel reference configs maintained in this repo to include initrd support.
   variants:
-    - condition: kconfig.PTXPlatformConfig().options['PLATFORM'] in ('v8a', 'v7a')
-      value: True
-    - value: False
+    - value: True
 
 barebox_oftree_fallback:
   description: |
