@@ -1,10 +1,5 @@
 #!/bin/sh
 
-if ! of_compatible arm,vexpress ; then
-	echo "9p is currently only available on QEMU ARM Vexpress"
-	return 1
-fi
-
 addpart /dev/nor0 "8M@32M(kernel)"
 addpart /dev/nor0 "512k@40M(dtb)"
 global.bootm.image="/dev/nor0.kernel"
