@@ -79,21 +79,6 @@ QEMU_ARGS=( "${QEMU_ARGS[@]}" -rtc base=2000-01-01 )
 # no watchdog available on vexpress
 #QEMU_ARGS=( "${QEMU_ARGS[@]}" -watchdog i6300esb -watchdog-action poweroff )
 QEMU_ARGS=( "${QEMU_ARGS[@]}" -object rng-random,filename=/dev/random,id=rng0 -device virtio-rng-device,rng=rng0 )
-# SCSI bus
-QEMU_ARGS=( "${QEMU_ARGS[@]}" -device virtio-scsi-device,id=scsi )
-# Add virtual SCSI device if available
-if [ -e "${PTXDIST_PLATFORMDIR}/images/usbstick.img" ]; then
-	echo "SCSI unplug/plug in the QEMU console (C-a c):"
-	echo
-	echo "device_del plug"
-	echo
-	echo "drive_add 0 if=none,format=raw,id=scsiplug,file=${PTXDIST_PLATFORMDIR}/images/usbstick.img"
-	echo "device_add scsi-hd,drive=scsiplug,removable=true,id=plug"
-	echo
-	QEMU_EXTRA_ARGS=( \
-		-drive if=none,format=raw,id=scsiplug,file=${PTXDIST_PLATFORMDIR}/images/usbstick.img \
-		-device scsi-hd,drive=scsiplug,removable=true,id=plug )
-fi
 QEMU_LINUX_ARGS=( -kernel ${PTXDIST_PLATFORMDIR}/images/linuximage -dtb ${PTXDIST_PLATFORMDIR}/images/vexpress-v2p-ca9.dtb )
 # the barebox device tree has a state node for bootchooser
 QEMU_BAREBOX_ARGS=( -dtb ${PTXDIST_PLATFORMDIR}/images/barebox-vexpress-v2p-ca9.dtb )
@@ -133,17 +118,6 @@ run_qemu_nfs() {
 		"${QEMU_EXTRA_ARGS[@]}" \
 		"${QEMU_LINUX_ARGS[@]}" \
 		-append "root=/dev/nfs nfsroot=/root,v3,tcp,port=2049,mountport=2049 ip=dhcp ${BASE_CMDLINE}"
-}
-
-run_qemu_scsi() {
-	check_hd
-	exec ${QEMU_EXEC} \
-		"${QEMU_ARGS[@]}" \
-		-drive if=none,format=raw,file=${PTXDIST_PLATFORMDIR}/images/hd.img,id=disk0 \
-		-device scsi-hd,drive=disk0 \
-		"${QEMU_EXTRA_ARGS[@]}" \
-		"${QEMU_LINUX_ARGS[@]}" \
-		-append "root=/dev/sda1 rootfstype=ext4 rootwait ${BASE_CMDLINE}"
 }
 
 run_qemu_mmc() {
