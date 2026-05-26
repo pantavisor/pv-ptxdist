@@ -15,4 +15,3 @@ for part in root-A root-B; do
 		echo -a /env/boot/bootsource.${part} "boot ${realbootsource}.${part}"
 	fi
 done
-saveenv
