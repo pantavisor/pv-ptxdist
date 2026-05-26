@@ -1,0 +1,4 @@
+#!/bin/sh
+
+global linux.bootargs.root="root=/dev/vda1 rootwait rw"
+bootm /mnt/virtioblk0.0/boot/zImage

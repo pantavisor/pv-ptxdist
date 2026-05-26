@@ -140,7 +140,7 @@ PTXCONF_KERNEL_IMAGE_Z=y
 PTXCONF_KERNEL_IMAGE="zImage"
 PTXCONF_KERNEL_DTB=y
 PTXCONF_KERNEL_DTS_PATH="${PTXDIST_PLATFORMCONFIG_SUBDIR}/dts:${KERNEL_DIR}/arch/${GENERIC_KERNEL_ARCH}/boot/dts"
-PTXCONF_KERNEL_DTS="ti/omap/am335x-bone.dts ti/omap/am335x-boneblack.dts arm/vexpress-v2p-ca9.dts broadcom/bcm2836-rpi-2-b.dts nxp/imx/imx6q-sabrelite.dts nxp/imx/imx6sx-udoo-neo-full.dts nxp/imx/imx6dl-riotboard.dts nxp/imx/imx6q-nitrogen6x.dts nxp/imx/imx6qp-nitrogen6_max.dts nxp/imx/imx6ull-14x14-evk.dts broadcom/bcm2837-rpi-3-b.dts broadcom/bcm2837-rpi-cm3-io3.dts broadcom/bcm2711-rpi-4-b.dts broadcom/bcm2711-rpi-400.dts st/stm32mp157c-dk2.dts st/stm32mp157c-ev1.dts st/stm32mp157c-lxa-mc1.dts stm32mp157c-lxa-mc1-scmi.dts st/stm32mp153c-lxa-fairytux2-gen1.dts st/stm32mp153c-lxa-fairytux2-gen2.dts st/stm32mp135f-dk.dts microchip/at91-sama5d27_som1_ek.dts at91-sama5d27_giantboard.dts at91-sama5d4_wifx_l1.dts "
+PTXCONF_KERNEL_DTS="ti/omap/am335x-bone.dts ti/omap/am335x-boneblack.dts broadcom/bcm2836-rpi-2-b.dts nxp/imx/imx6q-sabrelite.dts nxp/imx/imx6sx-udoo-neo-full.dts nxp/imx/imx6dl-riotboard.dts nxp/imx/imx6q-nitrogen6x.dts nxp/imx/imx6qp-nitrogen6_max.dts nxp/imx/imx6ull-14x14-evk.dts broadcom/bcm2837-rpi-3-b.dts broadcom/bcm2837-rpi-cm3-io3.dts broadcom/bcm2711-rpi-4-b.dts broadcom/bcm2711-rpi-400.dts st/stm32mp157c-dk2.dts st/stm32mp157c-ev1.dts st/stm32mp157c-lxa-mc1.dts stm32mp157c-lxa-mc1-scmi.dts st/stm32mp153c-lxa-fairytux2-gen1.dts st/stm32mp153c-lxa-fairytux2-gen2.dts st/stm32mp135f-dk.dts microchip/at91-sama5d27_som1_ek.dts at91-sama5d27_giantboard.dts at91-sama5d4_wifx_l1.dts "
 # PTXCONF_KERNEL_DTBO is not set
 # PTXCONF_KERNEL_CODE_SIGNING is not set
 # PTXCONF_KERNEL_ZSTD is not set

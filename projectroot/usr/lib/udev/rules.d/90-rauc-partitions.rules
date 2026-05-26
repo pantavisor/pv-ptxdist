@@ -10,7 +10,7 @@ IMPORT{program}="of_base_compatible"
 # to the correct partitions based on the device tree compatible
 
 # first part: find out the boot disk on known platforms
-ENV{OF_BASE_COMPATIBLE}=="*arm,vexpress,v2p-ca9*", ENV{ID_PATH}=="platform-bus@40000000:motherboard-bus@40000000:iofpga@7,00000000-amba-10005000.mmci", TAG+="boot_disk"
+ENV{OF_BASE_COMPATIBLE}=="*linux,dummy-virt*", ENV{ID_PATH}=="platform-*.virtio_mmio", TAG+="boot_disk"
 ENV{OF_BASE_COMPATIBLE}=="*lxa,stm32mp153c-fairytux2*", ENV{ID_PATH}=="platform-soc-amba-58007000.mmc", TAG+="boot_disk"
 ENV{OF_BASE_COMPATIBLE}=="*lxa,stm32mp157c-mc1*", ENV{ID_PATH}=="platform-soc-amba-58005000.mmc", TAG+="boot_disk"
 ENV{OF_BASE_COMPATIBLE}=="*ti,am335x-bone-black*", ENV{ID_PATH}=="platform-48060000.mmc", TAG+="boot_disk"
