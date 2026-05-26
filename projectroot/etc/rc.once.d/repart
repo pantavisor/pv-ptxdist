@@ -1,5 +1,5 @@
 #!/bin/sh
-if rdev | grep -q '/dev/hd.*[0-9]\|/dev/mmcblk.*[0-9]\|/dev/sd.*[0-9]\|/dev/vd.*[0-9])'; then
+if rdev | grep -q '/dev/hd.*[0-9]\|/dev/mmcblk.*[0-9]\|/dev/sd.*[0-9]\|/dev/vd.*[0-9]'; then
 	echo "Repartitioning the root disk..."
 	systemd-repart --dry-run=no --definitions=/etc/repart.rc-once.d/
 else
