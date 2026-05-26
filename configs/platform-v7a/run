@@ -69,8 +69,6 @@ fi
 QEMU_ARGS=( -machine virt -cpu cortex-a7 -smp 4 -m 1024M )
 # disable graphics output
 QEMU_ARGS[${#QEMU_ARGS[@]}]="-nographic"
-# Exit qemu on reboot
-QEMU_ARGS[${#QEMU_ARGS[@]}]="-no-reboot"
 # Configure networking
 QEMU_ARGS=( "${QEMU_ARGS[@]}" -device virtio-net-device,netdev=net1 "${QEMU_NET[@]}" )
 # Set base time to test NTP and time handling
