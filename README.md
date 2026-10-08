@@ -53,9 +53,8 @@ scripts/pv-docker.sh --build               # build the image locally instead
 ```
 
 The workspace is mounted at its host path and commands run with your
-uid/gid, so a build tree works both inside and outside the container. Run
-the `ptxdist select`/`platform`/`toolchain` steps above once (inside or
-outside), since they only create symlinks.
+uid/gid. The full workflow (first build, daily work, menuconfig, testing,
+options) is in [docs/building-with-docker.md](docs/building-with-docker.md).
 
 Outputs in `platform-v8a/images/`:
 
