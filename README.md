@@ -39,6 +39,24 @@ ptxdist images
 
 Build host needs `swig` (U-Boot binman for Rockchip).
 
+### In the build container
+
+`ghcr.io/pantavisor/pv-ptxdist-builder` has PTXdist, the OSELAS toolchains
+and all host dependencies; `docker/Dockerfile` builds it and CI publishes it
+on changes to `docker/`.
+
+```sh
+scripts/pv-docker.sh --pull                # fetch the image
+scripts/pv-docker.sh ptxdist images        # run one command
+scripts/pv-docker.sh                       # or a shell
+scripts/pv-docker.sh --build               # build the image locally instead
+```
+
+The workspace is mounted at its host path and commands run with your
+uid/gid, so a build tree works both inside and outside the container. Run
+the `ptxdist select`/`platform`/`toolchain` steps above once (inside or
+outside), since they only create symlinks.
+
 Outputs in `platform-v8a/images/`:
 
 - `pantavisor-bsp.pvrexport.tgz`: signed BSP (kernel, initramfs, modules and firmware squashfs)
@@ -58,7 +76,9 @@ Ctrl-A X quits QEMU.
 
 ## Changing configs
 
-Configs are stored as deltas to `base/`. After editing, or after updating
-`base/`, run `ptxdist oldconfig` (and `ptxdist oldconfig platform`,
-`ptxdist oldconfig kernel`) to regenerate the `.diff` files, and commit both
-the config and its `.diff`.
+Configs are stored as deltas to `base/`, and the `.diff` is what counts:
+`oldconfig` regenerates the full config from it, so a hand edit of the full
+config is lost. Change options with `ptxdist menuconfig` (`menuconfig
+platform`, `menuconfig kernel`), or edit the `.diff` and run `ptxdist
+oldconfig` (`oldconfig platform`, `oldconfig kernel`). Run the same after
+updating `base/`. Commit both the config and its `.diff`.
