@@ -1,0 +1,5 @@
+## SECTION=project_specific
+
+menu "Pantavisor                    "
+source "generated/pantavisor.in"
+endmenu

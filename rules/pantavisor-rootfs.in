@@ -1,0 +1,11 @@
+## SECTION=pantavisor
+
+config PANTAVISOR_ROOTFS
+	tristate
+	prompt "pantavisor initramfs layout"
+	depends on !ROOTFS_MEDIA
+	help
+	  Mount points and the /pv, /media and /configs links into
+	  /run/pantavisor that Pantavisor expects in its initramfs.
+	  Mirrors do_finish_rootfs of meta-pantavisor's
+	  pantavisor-initramfs image.

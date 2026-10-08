@@ -1,0 +1,22 @@
+## SECTION=pantavisor
+
+config LXC_PV
+	tristate
+	prompt "lxc-pv"
+	select LIBCAP
+	select GLIBC_GETENT
+	help
+	  Pantacor fork of LXC 3.0 used by the Pantavisor pv_lxc plugin.
+	  Kept separate from the upstream lxc package, which must not be
+	  enabled at the same time.
+
+if LXC_PV
+
+config LXC_PV_TOOLS
+	bool
+	prompt "install lxc-console/info/ls/top"
+	default y
+	help
+	  The subset of lxc tools meta-pantavisor ships for debugging.
+
+endif

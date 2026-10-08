@@ -1,0 +1,86 @@
+From a57e9275f1a5ff32233ba90a1b7f7c4d174d0ab4 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Wed, 12 Apr 2023 16:19:15 +0200
+Subject: [PATCH 310/310] unshare: add -C|--cgroup option similar to util-linux
+
+(cherry picked from commit 8143ead4fc16cdaccd0b5a38b13a4883b3809b7b)
+---
+ util-linux/unshare.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/util-linux/unshare.c b/util-linux/unshare.c
+index f58cdd9..3a53be0 100644
+--- a/util-linux/unshare.c
++++ b/util-linux/unshare.c
+@@ -31,6 +31,7 @@
+ //usage:     "\n	-n,--net[=FILE]		Unshare network namespace"
+ //usage:     "\n	-p,--pid[=FILE]		Unshare PID namespace"
+ //usage:     "\n	-U,--user[=FILE]	Unshare user namespace"
++//usage:     "\n	-C,--cgroup[=FILE]	Unshare cgroup namespace"
+ //usage:     "\n	-f			Fork before execing PROG"
+ //usage:     "\n	-r			Map current user to root (implies -U)"
+ //usage:     "\n	--mount-proc[=DIR]	Mount /proc filesystem first (implies -m)"
+@@ -105,11 +106,12 @@ enum {
+ 	OPT_net		= 1 << 3,
+ 	OPT_pid		= 1 << 4,
+ 	OPT_user	= 1 << 5, /* OPT_user, NS_USR_POS, and ns_list[] index must match! */
+-	OPT_fork	= 1 << 6,
+-	OPT_map_root	= 1 << 7,
+-	OPT_mount_proc	= 1 << 8,
+-	OPT_propagation	= 1 << 9,
+-	OPT_setgroups	= 1 << 10,
++	OPT_cgroup	= 1 << 6,
++	OPT_fork	= 1 << 7,
++	OPT_map_root	= 1 << 8,
++	OPT_mount_proc	= 1 << 9,
++	OPT_propagation	= 1 << 10,
++	OPT_setgroups	= 1 << 11,
+ };
+ enum {
+ 	NS_MNT_POS = 0,
+@@ -118,6 +120,7 @@ enum {
+ 	NS_NET_POS,
+ 	NS_PID_POS,
+ 	NS_USR_POS, /* OPT_user, NS_USR_POS, and ns_list[] index must match! */
++	NS_CGR_POS,
+ 	NS_COUNT,
+ };
+ static const struct namespace_descr ns_list[] ALIGN_INT = {
+@@ -127,6 +130,7 @@ static const struct namespace_descr ns_list[] ALIGN_INT = {
+ 	{ CLONE_NEWNET,  "net"  },
+ 	{ CLONE_NEWPID,  "pid"  },
+ 	{ CLONE_NEWUSER, "user" }, /* OPT_user, NS_USR_POS, and ns_list[] index must match! */
++	{ CLONE_NEWCGROUP, "cgroup" },
+ };
+ 
+ /*
+@@ -136,7 +140,7 @@ static const struct namespace_descr ns_list[] ALIGN_INT = {
+  * we are forced to use "fake" letters for them.
+  * '+': stop at first non-option.
+  */
+-#define OPT_STR "+muinpU""fr""\xfd::""\xfe:""\xff:"
++#define OPT_STR "+muinpUC""fr""\xfd::""\xfe:""\xff:"
+ static const char unshare_longopts[] ALIGN1 =
+ 	"mount\0"		Optional_argument	"\xf0"
+ 	"uts\0"			Optional_argument	"\xf1"
+@@ -144,6 +148,7 @@ static const char unshare_longopts[] ALIGN1 =
+ 	"net\0"			Optional_argument	"\xf3"
+ 	"pid\0"			Optional_argument	"\xf4"
+ 	"user\0"		Optional_argument	"\xf5"
++	"cgroup\0"		Optional_argument	"\xf5"
+ 	"fork\0"		No_argument		"f"
+ 	"map-root-user\0"	No_argument		"r"
+ 	"mount-proc\0"		Optional_argument	"\xfd"
+@@ -225,7 +230,8 @@ int unshare_main(int argc UNUSED_PARAM, char **argv)
+ 		&ns_ctx_list[NS_IPC_POS].path,
+ 		&ns_ctx_list[NS_NET_POS].path,
+ 		&ns_ctx_list[NS_PID_POS].path,
+-		&ns_ctx_list[NS_USR_POS].path
++		&ns_ctx_list[NS_USR_POS].path,
++		&ns_ctx_list[NS_CGR_POS].path
+ 	);
+ 	argv += optind;
+ 	//bb_error_msg("opts:0x%x", opts);
+-- 
+2.43.0
+

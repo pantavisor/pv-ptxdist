@@ -1,0 +1,12 @@
+## SECTION=pantavisor
+
+config DROPBEAR_PV
+	tristate
+	prompt "dropbear-pv"
+	select ZLIB
+	select LIBC_CRYPT
+	select LIBC_UTIL
+	help
+	  Dropbear fork that lets one SSH session reach any Pantavisor
+	  container. Conflicts with the upstream dropbear and openssh
+	  packages.

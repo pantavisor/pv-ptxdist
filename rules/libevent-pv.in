@@ -1,0 +1,25 @@
+## SECTION=pantavisor
+
+menuconfig LIBEVENT_PV
+	tristate
+	select LIBC_RT
+	select GCCLIBS_GCC_S
+	select MBEDTLS_PV
+	# installs the same headers and libraries
+	depends on !LIBEVENT
+	prompt "libevent 2.2 for Pantavisor   "
+	help
+	  libevent 2.2.1-alpha with its mbed TLS bufferevent backend,
+	  which Pantavisor links against. The upstream libevent package
+	  is 2.1, which has no mbed TLS support.
+
+if LIBEVENT_PV
+
+config LIBEVENT_PV_DEBUG_MODE
+	bool
+	prompt "enable debug mode"
+	help
+	  Extra runtime checks for API misuse, as enabled by
+	  meta-pantavisor.
+
+endif

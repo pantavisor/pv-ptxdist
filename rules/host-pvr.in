@@ -1,0 +1,9 @@
+## SECTION=hosttools_noprompt
+
+config HOST_PVR
+	tristate
+	default y if ALLYES
+	help
+	  pvr, the Pantavisor revision tool, used to assemble, sign and
+	  export Pantavisor trails. Installed from the upstream static
+	  linux/amd64 release binary, as PTXdist has no host Go toolchain.

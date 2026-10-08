@@ -1,0 +1,65 @@
+## SECTION=image
+
+menuconfig IMAGE_PV_STORAGE
+	tristate
+	select HOST_GENIMAGE
+	select HOST_E2FSPROGS
+	select IMAGE_PV_BSP
+	prompt "Generate images/pv-storage.ext4"
+	help
+	  The Pantavisor storage partition (ext4, label "root") with
+	  factory revision 0: the BSP plus the container pvrexports
+	  listed below, deployed into trails/0.
+
+if IMAGE_PV_STORAGE
+
+choice
+	prompt "bootloader integration"
+	default IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
+
+config IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
+	bool
+	prompt "U-Boot (boot/uboot.txt)"
+
+config IMAGE_PV_STORAGE_BOOTLOADER_GRUB
+	bool
+	prompt "GRUB"
+
+config IMAGE_PV_STORAGE_BOOTLOADER_RPIAB
+	bool
+	prompt "Raspberry Pi tryboot A/B"
+
+endchoice
+
+config IMAGE_PV_STORAGE_BOOTLOADER
+	string
+	default "uboot" if IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
+	default "grub" if IMAGE_PV_STORAGE_BOOTLOADER_GRUB
+	default "rpiab" if IMAGE_PV_STORAGE_BOOTLOADER_RPIAB
+
+config IMAGE_PV_STORAGE_SIZE
+	string
+	prompt "partition size"
+	default "1G"
+	help
+	  pv_e2fsgrow grows the partition to fill the disk on first boot.
+
+config IMAGE_PV_STORAGE_ALPINE_CONNMAN
+	bool
+	select HOST_PV_ALPINE_CONNMAN
+	prompt "pv-alpine-connman network container"
+	default y
+	help
+	  Without a container that configures the network, the device
+	  cannot reach Pantahub.
+
+config IMAGE_PV_STORAGE_CONTAINERS
+	string
+	prompt "container pvrexports for revision 0"
+	help
+	  Space separated paths, absolute or relative to the BSP, of
+	  container .pvrexport.tgz files deployed into the factory
+	  revision before the BSP, in addition to the ones selected
+	  above.
+
+endif

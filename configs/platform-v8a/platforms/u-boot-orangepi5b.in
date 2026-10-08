@@ -1,0 +1,19 @@
+## SECTION=bootloader
+
+config U_BOOT_ORANGEPI5B
+	tristate
+	prompt "U-Boot (Orange Pi 5B)"
+	select U_BOOT			if BUILDTIME
+	select TF_A
+	select RKBIN_RK3588
+	select HOST_SYSTEM_PYTHON3
+	select HOST_SYSTEM_PYTHON3_PYELFTOOLS
+	select HOST_SYSTEM_PYTHON3_DEV
+	help
+	  Mainline U-Boot for the Orange Pi 5B (RK3588S), built from the
+	  U-Boot version selected for the platform with TF-A BL31 and the
+	  rkbin DDR blob. Produces images/u-boot-rockchip-orangepi5b.bin,
+	  to be written at 32 KiB.
+
+	  Binman builds U-Boot's pylibfdt, which needs swig on the build
+	  host (PTXdist has no host-swig).

@@ -1,0 +1,9 @@
+## SECTION=hosttools_noprompt
+
+config HOST_PV_ALPINE_CONNMAN
+	tristate
+	default y if ALLYES
+	help
+	  Prebuilt pv-alpine-connman container pvrexport from the
+	  meta-pantavisor container releases. It runs ConnMan, which
+	  brings up the network the Pantahub client needs.

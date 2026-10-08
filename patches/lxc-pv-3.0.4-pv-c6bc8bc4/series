@@ -1,0 +1,2 @@
+# from meta-pantavisor recipes-pv/lxc-pv/files
+0001-add-new-config-lxc.tty.min-as-lower-bound-of-tty-all.patch

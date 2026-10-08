@@ -1,0 +1,14 @@
+## SECTION=pantavisor
+
+config MBEDTLS_PV
+	tristate
+	select HOST_CMAKE
+	select LIBC_PTHREAD
+	select ZLIB
+	# installs the same headers and libraries
+	depends on !MBEDTLS
+	prompt "mbedtls 2.28 for Pantavisor"
+	help
+	  mbed TLS 2.28 LTS built with the reduced configuration
+	  meta-pantavisor uses. Pantavisor, libthttp and libevent-pv need
+	  the 2.x API; the upstream mbedtls package is 3.x.

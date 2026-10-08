@@ -1,0 +1,9 @@
+## SECTION=pantavisor
+
+config PICOHTTPPARSER
+	tristate
+	prompt "picohttpparser"
+	select HOST_CMAKE
+	help
+	  Tiny HTTP request/response parser (Pantacor fork). Built as a
+	  static library only, so nothing is installed on the target.

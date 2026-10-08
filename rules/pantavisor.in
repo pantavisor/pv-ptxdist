@@ -1,0 +1,84 @@
+## SECTION=pantavisor
+
+menuconfig PANTAVISOR
+	tristate
+	prompt "pantavisor                    "
+	select HOST_CMAKE
+	select LIBTHTTP
+	select PICOHTTPPARSER
+	select MBEDTLS_PV
+	select LXC_PV
+	select ZLIB
+	select LIBEVENT_PV
+	select LIBC_DL
+	select LIBC_PTHREAD
+	select BUSYBOX_MDEV			if RUNTIME
+	select NETCAT				if RUNTIME && PANTAVISOR_PVCONTROL
+	select E2FSPROGS			if RUNTIME
+	select E2FSPROGS_INSTALL_MKE2FS		if RUNTIME
+	select E2FSPROGS_INSTALL_MKFS_EXT4	if RUNTIME
+	select E2FSPROGS_INSTALL_E2FSCK		if RUNTIME
+	select E2FSPROGS_INSTALL_FSCK_EXT4	if RUNTIME
+	select E2FSPROGS_INSTALL_RESIZE2FS	if RUNTIME && PANTAVISOR_E2FSGROW
+	select E2FSPROGS_INSTALL_DUMPE2FS	if RUNTIME && PANTAVISOR_E2FSGROW
+	select GPTFDISK				if RUNTIME && PANTAVISOR_E2FSGROW
+	select GPTFDISK_SGDISK			if RUNTIME && PANTAVISOR_E2FSGROW
+	# sgdisk is C++; gptfdisk.in does not select the runtime
+	select GCCLIBS_CXX			if RUNTIME && PANTAVISOR_E2FSGROW
+	select CRYPTSETUP			if RUNTIME && (PANTAVISOR_DM_CRYPT || PANTAVISOR_DM_VERITY)
+	select CRYPTSETUP_VERITYSETUP		if RUNTIME && PANTAVISOR_DM_VERITY
+	select LVM2				if RUNTIME && (PANTAVISOR_DM_CRYPT || PANTAVISOR_DM_VERITY)
+	select KEYUTILS				if RUNTIME && PANTAVISOR_DM_CRYPT
+	select NFTABLES				if RUNTIME
+	help
+	  Pantavisor: container-based init and update agent for embedded
+	  Linux. Built in "embedded" mode, i.e. it runs as PID 1 from the
+	  initramfs (/init -> /usr/bin/pantavisor).
+
+if PANTAVISOR
+
+config PANTAVISOR_DEBUG
+	bool
+	default y
+	prompt "debug build"
+	help
+	  -DPANTAVISOR_DEBUG=ON: enables the debug shell and extra
+	  logging. Not for production. On by default, as in
+	  meta-pantavisor (PANTAVISOR_FEATURES has "debug").
+
+config PANTAVISOR_DM_CRYPT
+	bool
+	prompt "dm-crypt volume support"
+
+config PANTAVISOR_DM_VERITY
+	bool
+	prompt "dm-verity volume support"
+
+config PANTAVISOR_E2FSGROW
+	bool
+	prompt "grow storage partition on first boot"
+	default y
+	help
+	  pv_e2fsgrow uses busybox fdisk on MBR disks and sgdisk on GPT
+	  disks.
+
+config PANTAVISOR_PVCONTROL
+	bool
+	prompt "install pvcontrol and pvcurl"
+	default y
+
+config PANTAVISOR_PVTX
+	bool
+	prompt "install pvtx"
+	default y
+
+config PANTAVISOR_XCONNECT
+	bool
+	prompt "build pv-xconnect"
+
+config PANTAVISOR_DEBUG_HOOKS
+	bool
+	prompt "install debug system hooks"
+	depends on PANTAVISOR_DEBUG
+
+endif

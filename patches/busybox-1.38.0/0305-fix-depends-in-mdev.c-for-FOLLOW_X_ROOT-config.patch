@@ -1,0 +1,26 @@
+From c8240a783910f6cef4f17a5ef1233a73cf797518 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Wed, 11 May 2022 21:15:45 +0200
+Subject: [PATCH 305/310] fix depends in mdev.c for FOLLOW_X_ROOT config
+
+(cherry picked from commit fb3b7e1353d126be78cd6f4c329a3018db5161d0)
+---
+ util-linux/mdev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/util-linux/mdev.c b/util-linux/mdev.c
+index f26533b..a5d5111 100644
+--- a/util-linux/mdev.c
++++ b/util-linux/mdev.c
+@@ -78,7 +78,7 @@
+ //config:config FEATURE_MDEV_FOLLOW_X_ROOT
+ //config:	bool "Support following a switch or pivot root in mount_namespace"
+ //config:	default y
+-//config:	depends on MDEV
++//config:	depends on MDEV_DAEMON
+ //config:	help
+ //config:	Add support for following a switch_root and pivot_root of pid 1
+ //config:	Useful for having mdev prefer the dev/ nodes of a root getting
+-- 
+2.43.0
+

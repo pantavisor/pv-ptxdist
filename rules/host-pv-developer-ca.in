@@ -1,0 +1,10 @@
+## SECTION=hosttools_noprompt
+
+config HOST_PV_DEVELOPER_CA
+	tristate
+	default y if ALLYES
+	help
+	  Pantacor developer CA keys (pvs.defaultkeys.tar.gz) used by
+	  pvr to sign development trails. Devices trust them through
+	  the certificates pantavisor installs in
+	  /etc/pantavisor/pvs/trust. Not for production.

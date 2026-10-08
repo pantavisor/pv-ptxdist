@@ -1,0 +1,40 @@
+## SECTION=image
+
+menuconfig IMAGE_PV_HD
+	tristate
+	select HOST_GENIMAGE
+	select HOST_DOSFSTOOLS
+	select HOST_MTOOLS
+	select HOST_U_BOOT_TOOLS
+	select IMAGE_PV_STORAGE
+	prompt "Generate images/pv-hd.img"
+	help
+	  Bootable Pantavisor disk: a vfat boot partition with the
+	  U-Boot boot script (boot.scr) and oemEnv.txt, followed by
+	  pv-storage.ext4. boot.scr finds the storage at boot
+	  partition + 1, so the order matters.
+
+if IMAGE_PV_HD
+
+config IMAGE_PV_HD_BOOT_SIZE
+	string
+	prompt "boot partition size"
+	default "64M"
+
+config IMAGE_PV_HD_BOOT_FILES
+	string
+	prompt "extra boot partition files"
+	help
+	  Space separated files from the images directory copied to the
+	  root of the boot partition, e.g. firmware and U-Boot for boards
+	  that load them from there. Empty for QEMU, which gets U-Boot
+	  through -bios.
+
+config IMAGE_PV_HD_OEMARGS
+	string
+	prompt "OEM kernel arguments"
+	help
+	  Appended to the kernel command line through oemEnv.txt
+	  (${oemargs} in boot.scr).
+
+endif

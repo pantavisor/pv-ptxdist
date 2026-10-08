@@ -1,0 +1,36 @@
+From 6ad9205c9dfb15bbe58fda7d93065233ae4f1d59 Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Thu, 8 Oct 2026 12:56:17 -0300
+Subject: [PATCH] gen_version: allow overriding the version via PV_GIT_DESCRIBE
+
+When pantavisor is built from a source tarball (e.g. by PTXdist or any
+other distro build system), there is no .git directory. 'git describe'
+then either fails or, worse, walks up and describes an unrelated parent
+repository such as the BSP the build directory lives in.
+
+Let the caller pass the version in PV_GIT_DESCRIBE and only fall back to
+'git describe --tags' when it is unset.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ gen_version.sh | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/gen_version.sh b/gen_version.sh
+index 9fd7b1b3..327d51fc 100755
+--- a/gen_version.sh
++++ b/gen_version.sh
+@@ -7,7 +7,9 @@ IFS=
+ now=$(date +'%y%m%d')
+ 
+ if [ "$type" = CMAKE ]; then
+-    gitdescribe=$(git describe --tags)
++    # Builds from a source tarball have no .git of their own, and git would
++    # walk up into whatever repository the build directory lives in.
++    gitdescribe=${PV_GIT_DESCRIBE:-$(git describe --tags)}
+ 
+     echo "const char *pv_build_manifest = \"\";" > $buildir/version.c
+     echo "const char *pv_build_version = \"${gitdescribe}-${now}${DISTRO_NAME:+ | ${DISTRO_NAME}}${DISTRO_VERSION:+ (${DISTRO_VERSION})}\";" >> $buildir/version.c
+-- 
+2.43.0
+

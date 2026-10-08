@@ -1,0 +1,7 @@
+## SECTION=bootloader
+
+config RKBIN_RK3588
+	tristate
+	help
+	  RK3588 DDR init blob from rockchip-linux/rkbin, used by U-Boot
+	  as ROCKCHIP_TPL. There is no open source DRAM init for RK3588.

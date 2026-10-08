@@ -1,0 +1,53 @@
+## SECTION=image
+
+menuconfig IMAGE_PV_BSP
+	tristate
+	select HOST_PVR
+	select HOST_PV_DEVELOPER_CA
+	select HOST_SQUASHFS_TOOLS
+	select HOST_SQUASHFS_TOOLS_XZ_SUPPORT
+	select HOST_SQUASHFS_TOOLS_LZ4_SUPPORT
+	select HOST_SQUASHFS_TOOLS_ZSTD_SUPPORT
+	select IMAGE_ROOT_CPIO
+	select IMAGE_KERNEL
+	select KERNEL
+	prompt "Generate images/pantavisor-bsp.pvrexport.tgz"
+	help
+	  Pantavisor BSP: kernel, the root filesystem as initramfs, the
+	  kernel modules and firmware as squashfs and bsp/run.json,
+	  signed with pvr and exported as a pvrexport. The root
+	  filesystem image must be gzip compressed.
+
+if IMAGE_PV_BSP
+
+config IMAGE_PV_BSP_FDT
+	string
+	prompt "device tree to ship as initial fdt"
+	help
+	  File name in the images directory (e.g. "rpi4.dtb"). Leave
+	  empty for boards where the bootloader provides the device tree,
+	  such as QEMU virt.
+
+config IMAGE_PV_BSP_DTBS
+	string
+	prompt "device trees for U-Boot to pick by fdtfile"
+	help
+	  Space separated kernel device trees, with their vendor
+	  directory (e.g. "rockchip/rk3588s-orangepi-5b.dtb"), copied to
+	  bsp/<path>. boot.scr loads bsp/${fdtfile} when the BSP has no
+	  initial fdt, so one BSP serves every board U-Boot knows the
+	  fdtfile of. Each one must be in the kernel's DTS list.
+
+config IMAGE_PV_BSP_FIRMWARE_PKGS
+	string
+	prompt "packages providing /lib/firmware"
+	help
+	  Space separated PTXdist package names. Their firmware goes
+	  into bsp/firmware.squashfs instead of the initramfs.
+
+config IMAGE_PV_BSP_SQUASHFS_OPTS
+	string
+	prompt "mksquashfs compression options"
+	default "-comp xz"
+
+endif

@@ -1,0 +1,17 @@
+# PTXdist's own busybox-1.38.0 patches, copied unchanged
+0200-reactivate-check-for-tty.patch
+0201-build-system-only-pass-real-libs-to-SELINUX_LIBS.patch
+0202-scripts-trylink-honour-SKIP_STRIP-and-don-t-strip-if.patch
+0203-tc-Fix-compilation-with-Linux-v6.8-rc1.patch
+# Pantavisor features from github.com/pantavisor/busybox-pv (pv/1_35_stable), rebased onto 1.38.0
+0300-add-caps-flag-to-make-nsenter-also-adopt-the-same-ca.patch
+0301-fix-capget-to-be-run-before-switching-namespaces.patch
+0302-nsenter.c-add-C-cgropup-option-similar-to-util-linux.patch
+0303-add-support-for-ROOTFSDIR-and-MDEV_CONF-envs.patch
+0304-add-support-for-FOLLOW_X_ROOT-env-superseed-ROOTFSDI.patch
+0305-fix-depends-in-mdev.c-for-FOLLOW_X_ROOT-config.patch
+0306-add-FOLLOW_X_PID-support-for-pantavisor-mdev.patch
+0307-fix-create_and_bind_to_netlink-setting-sa.nl_pid-to-.patch
+0308-Improve-mdev-MODALIAS-support-loading-pci-bus-driver.patch
+0309-add-support-for-unix_proxy-env-for-wget.patch
+0310-unshare-add-C-cgroup-option-similar-to-util-linux.patch

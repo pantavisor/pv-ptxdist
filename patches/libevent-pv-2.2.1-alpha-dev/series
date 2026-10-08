@@ -1,0 +1,3 @@
+# from meta-pantavisor recipes-pv/libevent/files
+undef_ssl_renegotiation.patch
+evhttp-null-guard-freed-conn.patch

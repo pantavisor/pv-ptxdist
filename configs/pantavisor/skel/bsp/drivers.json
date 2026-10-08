@@ -1,0 +1,10 @@
+{
+    "#spec": "driver-aliases@1",
+    "all": {
+        "wireguard": [
+            "wireguard"
+        ]
+    },
+    "dtb:all": {}
+}
+

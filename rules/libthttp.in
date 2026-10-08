@@ -1,0 +1,11 @@
+## SECTION=pantavisor
+
+config LIBTHTTP
+	tristate
+	prompt "libthttp"
+	select HOST_CMAKE
+	select MBEDTLS_PV
+	help
+	  Tiny HTTP/REST client library used by Pantavisor to talk to
+	  Pantahub. The library itself is static; only the TLS root
+	  certificates are installed on the target.

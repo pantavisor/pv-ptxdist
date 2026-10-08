@@ -1,0 +1,14 @@
+## SECTION=pantavisor
+
+# Option added by the busybox-pv patches in patches/busybox-1.38.0. PTXdist's
+# busybox Kconfig mirror does not know it, and busybox.make passes every
+# PTXCONF_BUSYBOX_* symbol through to busybox's .config.
+config BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT
+	bool
+	prompt "busybox mdev: follow switch/pivot root (FOLLOW_X_ROOT)"
+	depends on BUSYBOX_FEATURE_MDEV_DAEMON
+	default y
+	help
+	  Needed by Pantavisor's container mdev hook
+	  (hooks_lxc-mount.d/mdev.sh), which runs a per-container
+	  mdev daemon inside the container's mount namespace.

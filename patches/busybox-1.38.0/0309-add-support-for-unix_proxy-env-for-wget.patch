@@ -1,0 +1,51 @@
+From f6179f2cb509b67bc9c700cc6bf5b75b1b629910 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Fri, 24 Mar 2023 12:08:00 +0100
+Subject: [PATCH 309/310] add support for unix_proxy= env for wget;
+
+Example: unix_proxy=local:/run/socketX wget http://localhost/test.cgi
+
+This will make HTTP call to local unix socket /run/socketX
+
+(cherry picked from commit bda882eee7f2376a40a662693d121433aa9ce6df)
+---
+ networking/wget.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/networking/wget.c b/networking/wget.c
+index ec37677..2b94dc5 100644
+--- a/networking/wget.c
++++ b/networking/wget.c
+@@ -1103,6 +1103,7 @@ static void download_one_url(const char *url)
+ 	FILE *dfp;                      /* socket to ftp server (data)      */
+ 	char *fname_out_alloc;
+ 	char *redirected_path = NULL;
++	char *unix_proxy = NULL;
+ 	struct host_info server;
+ 	struct host_info target;
+ 
+@@ -1115,6 +1116,9 @@ static void download_one_url(const char *url)
+ 
+ 	/* Use the proxy if necessary */
+ 	use_proxy = (strcmp(G.proxy_flag, "off") != 0);
++	/* Use local: unix socket as proxy rather than a http one.
++	   Example: unix_proxy=local:/run/socketX wget http://localhost/test.cgi */
++	unix_proxy = getenv("unix_proxy");
+ 	if (use_proxy) {
+ 		char *proxy = getenv(target.protocol[0] == 'f' ? "ftp_proxy" : "http_proxy");
+ //FIXME: what if protocol is https? Ok to use http_proxy?
+@@ -1125,7 +1129,10 @@ static void download_one_url(const char *url)
+ 	if (!use_proxy) {
+ 		server.protocol = target.protocol;
+ 		server.port = target.port;
+-		if (ENABLE_FEATURE_IPV6) {
++		// must be unix proxy here
++		if (unix_proxy) {
++			server.host = xstrdup(unix_proxy);
++		} else if (ENABLE_FEATURE_IPV6) {
+ 			//free(server.allocated); - can't be non-NULL
+ 			server.host = server.allocated = xstrdup(target.host);
+ 		} else {
+-- 
+2.43.0
+
