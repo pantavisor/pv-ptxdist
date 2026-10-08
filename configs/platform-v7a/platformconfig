@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# PTXdist 2026.03.0
+# PTXdist 2026.10.0
 #
 PTXCONF__platformconfig_MAGIC__=y
 
@@ -22,7 +22,7 @@ PTXCONF_BUILDTIME=y
 PTXCONF_VIRTUAL=y
 PTXCONF_VIRTUAL_HOST_TOOLS=y
 PTXCONF_VIRTUAL_AUTOGEN_TOOLS=y
-PTXCONF_PLATFORMCONFIG_VERSION="2026.03.0"
+PTXCONF_PLATFORMCONFIG_VERSION="2026.10.0"
 
 #
 # architecture                  
@@ -70,7 +70,7 @@ PTXCONF_SYSROOT_CROSS="${PTXDIST_PLATFORMDIR}/sysroot-cross"
 #
 # toolchain                     
 #
-PTXCONF_CROSSCHAIN_VENDOR="OSELAS.Toolchain-2025.11.0"
+PTXCONF_CROSSCHAIN_VENDOR="OSELAS.Toolchain-2025.11.1"
 PTXCONF_CROSSCHAIN_CHECK="15.2.1"
 PTXCONF_LIBC_GLIBC=y
 # PTXCONF_LIBC_UCLIBC is not set
@@ -141,6 +141,7 @@ PTXCONF_KERNEL_IMAGE="zImage"
 PTXCONF_KERNEL_DTB=y
 PTXCONF_KERNEL_DTS_PATH="${PTXDIST_PLATFORMCONFIG_SUBDIR}/dts:${KERNEL_DIR}/arch/${GENERIC_KERNEL_ARCH}/boot/dts"
 PTXCONF_KERNEL_DTS="ti/omap/am335x-bone.dts ti/omap/am335x-boneblack.dts broadcom/bcm2836-rpi-2-b.dts nxp/imx/imx6q-sabrelite.dts nxp/imx/imx6sx-udoo-neo-full.dts nxp/imx/imx6dl-riotboard.dts nxp/imx/imx6q-nitrogen6x.dts nxp/imx/imx6qp-nitrogen6_max.dts nxp/imx/imx6ull-14x14-evk.dts broadcom/bcm2837-rpi-3-b.dts broadcom/bcm2837-rpi-cm3-io3.dts broadcom/bcm2711-rpi-4-b.dts broadcom/bcm2711-rpi-400.dts st/stm32mp157c-dk2.dts st/stm32mp157c-ev1.dts st/stm32mp157c-lxa-mc1.dts stm32mp157c-lxa-mc1-scmi.dts st/stm32mp153c-lxa-fairytux2-gen1.dts st/stm32mp153c-lxa-fairytux2-gen2.dts st/stm32mp135f-dk.dts microchip/at91-sama5d27_som1_ek.dts at91-sama5d27_giantboard.dts at91-sama5d4_wifx_l1.dts "
+# PTXCONF_KERNEL_DTB_CHECK is not set
 # PTXCONF_KERNEL_DTBO is not set
 # PTXCONF_KERNEL_CODE_SIGNING is not set
 # PTXCONF_KERNEL_ZSTD is not set
@@ -344,6 +345,7 @@ PTXCONF_CODE_SIGNING_PROVIDER="devel"
 PTXCONF_CODE_SIGNING_PROVIDER_DEVEL=y
 PTXCONF_HOST_PTX_CODE_SIGNING_DEV=y
 PTXCONF_HOST_CMAKE=y
+PTXCONF_HOST_COMPOSEFS=y
 PTXCONF_HOST_DOSFSTOOLS=y
 PTXCONF_HOST_DTC=y
 PTXCONF_HOST_E2FSPROGS=y
@@ -368,6 +370,7 @@ PTXCONF_HOST_OPENSC=y
 PTXCONF_HOST_OPENSSL=y
 PTXCONF_HOST_P11_KIT=y
 PTXCONF_HOST_PCRE2=y
+PTXCONF_HOST_PKCS11_PROVIDER=y
 PTXCONF_HOST_PKGCONF=y
 PTXCONF_HOST_RAUC=y
 PTXCONF_HOST_SOFTHSM=y
@@ -389,6 +392,7 @@ PTXCONF_HOST_SYSTEM_PYTHON3_CRYPTOGRAPHY=y
 PTXCONF_HOST_UTIL_LINUX=y
 PTXCONF_HOST_ZLIB=y
 PTXCONF_HOST_TF_A=y
+# PTXCONF_CRYPTODEV is not set
 
 #
 # non-free firmware blobs       
