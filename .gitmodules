@@ -1,3 +1,4 @@
 [submodule "base"]
 	path = base
-	url = https://git.pengutronix.de/git/DistroKit
+	url = ../pv-ptxdist.git
+	branch = distrokit

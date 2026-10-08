@@ -8,11 +8,15 @@ packages, image types and config deltas (`*.diff`) against it.
 
 Needs PTXdist 2026.10.0 and OSELAS.Toolchain 2025.11.1.
 
+The `distrokit` branch is upstream DistroKit plus its migration to PTXdist
+2026.10.0, which upstream has not done yet. Once it has, `base/` can point at
+upstream DistroKit directly.
+
 ## Layout
 
 | Path | What |
 |---|---|
-| `base/` | DistroKit (git submodule) |
+| `base/` | DistroKit (git submodule, the `distrokit` branch of this repository) |
 | `configs/ptxconfig{,.diff}` | Pantavisor initramfs userland, as a delta to DistroKit's |
 | `configs/platform-v8a/*.diff` | v8a platform and kernel deltas: U-Boot instead of barebox, Pantavisor images, kernel fragments |
 | `configs/platform-v8a/u-boot*.config` | U-Boot for QEMU arm64 and the Orange Pi 5B |
