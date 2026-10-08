@@ -9,6 +9,8 @@ config U_BOOT_ORANGEPI5B
 	select HOST_SYSTEM_PYTHON3
 	select HOST_SYSTEM_PYTHON3_PYELFTOOLS
 	select HOST_SYSTEM_PYTHON3_DEV
+	# mkimage includes <openssl/evp.h> (CONFIG_TOOLS_LIBCRYPTO)
+	select HOST_OPENSSL
 	help
 	  Mainline U-Boot for the Orange Pi 5B (RK3588S), built from the
 	  U-Boot version selected for the platform with TF-A BL31 and the
