@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: ${{ matrix.platform }}
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 360
     permissions:
       contents: read
@@ -37,13 +37,7 @@ jobs:
     env:
       TOOLCHAIN: /opt/OSELAS.Toolchain-2025.11.1/${{ matrix.toolchain }}/gcc-15.2.1-clang-21.1.8-glibc-2.42-binutils-2.45.1-kernel-6.17.6-sanitized/bin
     steps:
-      # A platform build tree is ~10 GB on top of the 5.7 GB build image; the
-      # runner's preinstalled SDKs would leave too little room.
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
-
+      # A platform build tree is ~10 GB on top of the 5.7 GB build image.
       - uses: actions/checkout@v4
         with:
           submodules: recursive
