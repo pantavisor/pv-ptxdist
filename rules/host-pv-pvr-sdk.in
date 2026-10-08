@@ -1,0 +1,10 @@
+## SECTION=hosttools_noprompt
+
+config HOST_PV_PVR_SDK
+	tristate
+	default y if ALLYES
+	help
+	  Prebuilt pv-pvr-sdk container pvrexport from the
+	  meta-pantavisor container releases: an SDK shell with pvr and
+	  SSH access to the device, keyed by the pvr-sdk.authorized_keys
+	  user-meta.

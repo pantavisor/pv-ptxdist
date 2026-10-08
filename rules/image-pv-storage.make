@@ -35,6 +35,8 @@ IMAGE_PV_STORAGE_USER_CONTAINERS := $(foreach c, \
 IMAGE_PV_STORAGE_CONTAINERS := \
 	$(call ptx/ifdef, PTXCONF_IMAGE_PV_STORAGE_ALPINE_CONNMAN, \
 		$(PTXDIST_SYSROOT_HOST)/usr/share/pantavisor/containers/pv-alpine-connman.pvrexport.tgz) \
+	$(call ptx/ifdef, PTXCONF_IMAGE_PV_STORAGE_PVR_SDK, \
+		$(PTXDIST_SYSROOT_HOST)/usr/share/pantavisor/containers/pv-pvr-sdk.pvrexport.tgz) \
 	$(IMAGE_PV_STORAGE_USER_CONTAINERS)
 
 IMAGE_PV_STORAGE_ENV := \
@@ -54,6 +56,8 @@ $(IMAGE_PV_STORAGE_FILES): \
 		$(IMAGE_PV_BSP_IMAGE) \
 		$(call ptx/ifdef, PTXCONF_IMAGE_PV_STORAGE_ALPINE_CONNMAN, \
 			$(STATEDIR)/host-pv-alpine-connman.install.post) \
+		$(call ptx/ifdef, PTXCONF_IMAGE_PV_STORAGE_PVR_SDK, \
+			$(STATEDIR)/host-pv-pvr-sdk.install.post) \
 		$(IMAGE_PV_STORAGE_USER_CONTAINERS)
 	@$(call targetinfo)
 	@env -i \

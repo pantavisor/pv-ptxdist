@@ -282,5 +282,7 @@ echo "Pantavisor go... : bootm ${kernel_addr_r} ${ramdisk_addr_r}:${rd_size} ${f
 bootm ${kernel_addr_r} ${ramdisk_addr_r}:${rd_size} ${fdt_addr_r}
 echo "Pantavisor go... : bootelf ${kernel_addr_r} ${ramdisk_addr_r}:${rd_size} ${fdt_addr_r}"
 bootelf ${kernel_addr_r} ${ramdisk_addr_r}:${rd_size} ${fdt_addr_r}
+echo "Pantavisor go... : zboot ${kernel_addr_r} 0 ${ramdisk_addr_r} ${rd_size}"
+zboot ${kernel_addr_r} 0 ${ramdisk_addr_r} ${rd_size}
 echo "Failed to boot step, rebooting"; sleep 5; reset
 

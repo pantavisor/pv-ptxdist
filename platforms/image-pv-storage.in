@@ -53,6 +53,15 @@ config IMAGE_PV_STORAGE_ALPINE_CONNMAN
 	  Without a container that configures the network, the device
 	  cannot reach Pantahub.
 
+config IMAGE_PV_STORAGE_PVR_SDK
+	bool
+	select HOST_PV_PVR_SDK
+	prompt "pv-pvr-sdk container"
+	default y
+	help
+	  SDK shell with pvr, reachable over SSH with the keys in the
+	  device's pvr-sdk.authorized_keys user-meta.
+
 config IMAGE_PV_STORAGE_CONTAINERS
 	string
 	prompt "container pvrexports for revision 0"

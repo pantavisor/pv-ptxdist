@@ -1,0 +1,15 @@
+## SECTION=image
+
+config IMAGE_PV_RPI4
+	tristate
+	select HOST_GENIMAGE
+	select HOST_DOSFSTOOLS
+	select HOST_MTOOLS
+	select IMAGE_PV_HD
+	select U_BOOT_RPI4
+	prompt "Generate images/pv-rpi4.img"
+	help
+	  Pantavisor SD card image for the Raspberry Pi 4: a vfat boot
+	  partition with the GPU firmware, config.txt, the devicetree,
+	  U-Boot and boot.scr, then pv-storage.ext4. Needs
+	  broadcom/bcm2711-rpi-4-b.dts in the kernel's devicetree list.

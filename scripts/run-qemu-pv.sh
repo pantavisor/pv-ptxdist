@@ -5,8 +5,9 @@
 # usage: scripts/run-qemu-pv.sh [--direct] <platform> [qemu args...]
 #   e.g. scripts/run-qemu-pv.sh v8a
 #
-# Default: U-Boot (images/u-boot.bin as -bios) boots images/pv-hd.img through
-# boot.scr, i.e. the same path as on hardware, including try-boot/rollback.
+# Default: U-Boot (images/u-boot.bin, u-boot.rom on x86_64, as -bios) boots
+# images/pv-hd.img through boot.scr, i.e. the same path as on hardware,
+# including try-boot/rollback.
 # --direct: boots images/linuximage + images/root.cpio.gz with the kernel
 # arguments boot.scr would pass, on images/pv-storage.ext4, skipping U-Boot.
 #
@@ -27,11 +28,37 @@ shift
 bsp="$(cd "$(dirname "$0")/.." && pwd)"
 images="${bsp}/platform-${platform}/images"
 
+case "${platform}" in
+v8a)
+	qemu=(qemu-system-aarch64 -M virt -cpu cortex-a57)
+	console=ttyAMA0
+	firmware=u-boot.bin
+	dev=device
+	;;
+v7a)
+	qemu=(qemu-system-arm -M virt -cpu cortex-a7)
+	console=ttyAMA0
+	firmware=u-boot.bin
+	dev=device
+	;;
+x86_64)
+	# U-Boot's qemu-x86_64 build supports the default i440fx machine, not q35.
+	qemu=(qemu-system-x86_64 -M pc)
+	console=ttyS0
+	firmware=u-boot.rom
+	dev=pci
+	;;
+*)
+	echo "no QEMU setup for platform '${platform}'" >&2
+	exit 1
+	;;
+esac
+
 if [ -n "${direct}" ]; then
 	needed="linuximage root.cpio.gz pv-storage.ext4"
 	disk_src="pv-storage.ext4"
 else
-	needed="u-boot.bin pv-hd.img"
+	needed="${firmware} pv-hd.img"
 	disk_src="pv-hd.img"
 fi
 for f in ${needed}; do
@@ -49,21 +76,6 @@ if [ -z "${disk}" ]; then
 	truncate -s 4G "${disk}"
 fi
 
-case "${platform}" in
-v8a)
-	qemu=(qemu-system-aarch64 -M virt -cpu cortex-a57)
-	console=ttyAMA0
-	;;
-v7a)
-	qemu=(qemu-system-arm -M virt -cpu cortex-a7)
-	console=ttyAMA0
-	;;
-*)
-	echo "no QEMU setup for platform '${platform}'" >&2
-	exit 1
-	;;
-esac
-
 if [ -n "${direct}" ]; then
 	boot=(
 		-kernel "${images}/linuximage"
@@ -71,7 +83,7 @@ if [ -n "${direct}" ]; then
 		-append "console=${console} panic=3 root=/dev/ram rootfstype=ramfs rdinit=/usr/bin/pantavisor pv_try=0 pv_rev=0"
 	)
 else
-	boot=(-bios "${images}/u-boot.bin")
+	boot=(-bios "${images}/${firmware}")
 fi
 
 # Not exec: the trap has to remove the scratch disk afterwards.
@@ -79,7 +91,7 @@ fi
 	-smp 2 -m 1024 -nographic \
 	"${boot[@]}" \
 	-drive if=none,file="${disk}",format=raw,id=hd0 \
-	-device virtio-blk-device,drive=hd0 \
+	-device virtio-blk-${dev},drive=hd0 \
 	-netdev user,id=net0,hostfwd=tcp:127.0.0.1:${PV_SSH_PORT:-8222}-:8222 \
-	-device virtio-net-device,netdev=net0 \
+	-device virtio-net-${dev},netdev=net0 \
 	"$@"
