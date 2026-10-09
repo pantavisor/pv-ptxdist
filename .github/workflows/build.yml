@@ -60,35 +60,58 @@ jobs:
         run: |
           exec 9>/tmp/pv-ptxdist-builder.lock
           flock 9
-          id -u builder >/dev/null 2>&1 || useradd -m -s /bin/bash builder || true
-          getent group docker >/dev/null && usermod -aG docker builder || true
+          if ! id -u builder >/dev/null 2>&1; then
+            useradd -m -s /bin/bash builder 2>/dev/null \
+              || adduser -D -g builder builder 2>/dev/null \
+              || true
+          fi
           flock -u 9
-          id -u builder
-          # ptxdist creates the selected_* links by absolute path, so uid
-          # 'builder' must reach the workspace on the host: runner homes are
-          # roamed 750 in some installs.
+          # Nobody by that name can be created (some runners lack the shadow
+          # tools): run as an existing regular account instead.
+          build_user=builder
+          if ! id -u "$build_user" >/dev/null 2>&1; then
+            build_user="$(awk -F: '$6 ~ /^\/home\// && $7 ~ /sh$/ {print $1; exit}' /etc/passwd)"
+          fi
+          echo "building as '$build_user'"
+          mkdir -p src
+          # Different installs ship different group tools; append the user to
+          # the docker group if (and only if) it is not a member. The docker
+          # socket requires it; sudo picks it up at the next exec.
+          if ! awk -F: -v u="$build_user" '
+              $1 == "docker" { for (i = 4; i <= NF; i++) if ($i == u) ok = 1 }
+              END { exit(ok ? 0 : 1) ; }' /etc/group; then
+            usermod -aG docker "$build_user" 2>/dev/null \
+              || gpasswd -a "$build_user" docker 2>/dev/null \
+              || awk -F: -v u="$build_user" 'BEGIN { OFS = ":" }
+                  $1 == "docker" { $4 = ($4 == "" ? u : $4 "," u); } { print }' /etc/group \
+                | cat > /etc/group
+          fi
+          # ptxdist creates the selected_* links by absolute path, so the
+          # build user must reach the workspace on the host: runner homes are
+          # 750 in some installs.
           p="$(dirname "$GITHUB_WORKSPACE")"
           for _ in 1 2 3 4; do
             chmod a+x "$p" 2>/dev/null || true
             p="$(dirname "$p")"
           done
-          chown -R builder:builder .
+          chown -R "$build_user":"$(id -g -n "$build_user")" .
+          echo "BUILD_USER=$build_user" >> "$GITHUB_ENV"
 
       - name: Log in to ghcr.io
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | sudo -E -H -u builder docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | sudo -E -H -u "$BUILD_USER" docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Pull the build image
-        run: sudo -E -H -u builder scripts/pv-docker.sh --pull
+        run: sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh --pull
 
       # Downloads only; the build itself always starts clean.
       - name: Select the platform
-        run: sudo -E -H -u builder scripts/pv-docker.sh sh -c "
+        run: sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh sh -c "
           ptxdist select configs/ptxconfig &&
           ptxdist platform configs/platform-${{ matrix.platform }}/platformconfig &&
           ptxdist toolchain ${TOOLCHAIN}"
 
       - name: Build
-        run: sudo -E -H -u builder scripts/pv-docker.sh sh -c 'ptxdist -q -j$(nproc) images'
+        run: sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh sh -c 'ptxdist -q -j$(nproc) images'
 
       - uses: actions/upload-artifact@v4
         with:
