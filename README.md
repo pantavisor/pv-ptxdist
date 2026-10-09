@@ -142,8 +142,10 @@ meta-pantavisor's `buildkas-target.yaml` uses). Machine requirements:
 - keep at least ~30 GB free: ~10 GB build tree, 5.7 GB container, plus the
   `src/` downloads cache.
 
-The run is triggered by pushes to `main`, pull requests, and
-`workflow_dispatch`; artifacts are named `pv-ptxdist-<target>`.
+The run is triggered by pushes to `main`, tags (matching `v*`, e.g. a
+release marker), pull requests, and `workflow_dispatch`; artifacts are
+named `pv-ptxdist-<target>` per run. Doc-only pushes and pull requests
+are skipped.
 
 ## Changing configs
 

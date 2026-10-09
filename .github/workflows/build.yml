@@ -1,10 +1,13 @@
-# Skip the build for doc-only commits: three ~15-minute runs.
+# Runs for pushes to main and for tags (e.g. release markers). Doc-only
+# commits are skipped: three ~15-minute builds is too much for a README fix.
 name: build
 
 on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
     paths-ignore:
       - '**.md'
       - 'docs/**'
