@@ -70,6 +70,7 @@ build machine needs are Docker and git.
    |---|---|
    | `pv-hd.img` | QEMU arm64 disk: boot partition plus storage |
    | `pv-orangepi5b.img` | Orange Pi 5B SD card / eMMC image |
+   | `pv-rpi4.img` | Raspberry Pi 4 SD card image |
    | `pantavisor-bsp.pvrexport.tgz` | Signed BSP, for updates through Pantahub |
    | `pv-storage.ext4` | Storage partition with factory revision 0 |
    | `u-boot.bin` | U-Boot for QEMU (`-bios`) |
@@ -92,6 +93,7 @@ scripts/pv-docker.sh ptxdist menuconfig            # userland (ptxconfig)
 scripts/pv-docker.sh ptxdist menuconfig platform   # platform, images
 scripts/pv-docker.sh ptxdist menuconfig kernel
 scripts/pv-docker.sh ptxdist menuconfig u-boot-orangepi5b
+scripts/pv-docker.sh ptxdist menuconfig u-boot-rpi4
 ```
 
 Configs are deltas to `base/`: commit both the config and its `.diff`
@@ -109,19 +111,44 @@ exit
 
 ## Testing
 
-QEMU is not in the image; run it on the host (`qemu-system-arm` package on
-Ubuntu/Debian):
+QEMU is not in the image; run it on the host (`qemu-system-arm` and
+`qemu-system-x86` packages on Ubuntu/Debian):
 
 ```sh
-scripts/run-qemu-pv.sh v8a
+scripts/run-qemu-pv.sh v8a      # QEMU arm64: U-Boot boots pv-hd.img
+scripts/run-qemu-pv.sh x86_64   # QEMU x86_64: u-boot.rom boots pv-hd.img
 ```
 
+Both boot the same path as on hardware: U-Boot loads `boot.scr`, boots
+factory revision 0 of `pv-hd.img` and Pantavisor brings up the `os`
+container, `pvr-sdk` and the encrypted `dm-versatile` secrets disk.
 Press Enter at `Press [ENTER] for debug ash shell...` for a shell on the
-device. Ctrl-A X quits QEMU.
+device; Ctrl-A X quits QEMU.
+
+Set `PV_DISK=/path/to/disk.img` to keep the disk between runs
+(update installs, Pantahub device identity): copy `pv-hd.img` first —
+`cp` truncates — then `truncate -s 4G` as shown in the README's Run
+section. Debug logs are on the storage partition
+(`/logs/0/pantavisor/pantavisor.log`), not the console; extract them with
+`debugfs`, see the README's Run section.
 
 For the Orange Pi 5B, write `platform-v8a/images/pv-orangepi5b.img` to an SD
 card or to the eMMC (with `rkdeveloptool`), and watch the serial console at
-1500000 baud.
+1500000 baud. For the Raspberry Pi 4, write `pv-rpi4.img` to an SD card and
+watch its serial console at 115200 baud.
+
+## CI
+
+The `.github/workflows/build.yml` workflow builds three targets, one job
+each (`orangepi5b`, `rpi4`, `qemu_x86`) inside the `pv-ptxdist-builder`
+container, on the self-hosted machines with the `bsp-builder` label. Each
+job runs `ptxdist image <img>` and uploads the image plus the signed
+`pantavisor-bsp.pvrexport.tgz` as the `pv-ptxdist-<target>` artifact.
+
+The runner box only needs Docker: the workflow creates a non-root
+`builder` user (PTXdist refuses to run as root), gives it the docker
+socket and makes the runner workspace path traversable for it; machine
+requirements are listed in the README's CI section.
 
 ## Options
 

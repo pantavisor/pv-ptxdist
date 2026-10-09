@@ -1,10 +1,17 @@
+# Skip the build for doc-only commits: three ~15-minute runs.
 name: build
 
 on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 jobs:
