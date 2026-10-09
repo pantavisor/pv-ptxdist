@@ -1,0 +1,37 @@
+## SECTION=pv_boards
+
+config IMAGE_PV_BOOT
+	bool
+	select HOST_GENIMAGE
+	select HOST_DOSFSTOOLS
+	select HOST_MTOOLS
+	select HOST_U_BOOT_TOOLS
+	select IMAGE_PV_STORAGE
+	help
+	  Selected by the boards: the vfat boot partition with the U-Boot
+	  boot script (boot.scr) and oemEnv.txt that all of them carry.
+
+if IMAGE_PV_BOOT
+
+comment "boot partition (all boards)"
+
+config IMAGE_PV_BOOT_SIZE
+	string
+	prompt "boot partition size"
+	default "64M"
+
+config IMAGE_PV_BOOT_EXTRA_FILES
+	string
+	prompt "extra boot partition files"
+	help
+	  Space separated files from the images directory copied to the
+	  root of the boot partition.
+
+config IMAGE_PV_BOOT_OEMARGS
+	string
+	prompt "OEM kernel arguments"
+	help
+	  Appended to the kernel command line through oemEnv.txt
+	  (${oemargs} in boot.scr).
+
+endif

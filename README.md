@@ -31,47 +31,81 @@ DistroKit platforms build DistroKit's own images.
 
 ## Build
 
+Build one device at a time with `scripts/pv-build.sh`. It runs in the build
+container, selects the device's platform and toolchain, and builds only that
+device's image and everything it needs:
+
 ```sh
-git clone --recursive <this repo> pv-ptxdist && cd pv-ptxdist
-ptxdist select configs/ptxconfig
-ptxdist platform configs/platform-v8a/platformconfig
-ptxdist toolchain /opt/OSELAS.Toolchain-2025.11.1/aarch64-v8a-linux-gnu/gcc-15.2.1-clang-21.1.8-glibc-2.42-binutils-2.45.1-kernel-6.17.6-sanitized/bin
-ptxdist images
+git clone --recursive git@github.com:pantavisor/pv-ptxdist.git && cd pv-ptxdist
+scripts/pv-docker.sh --pull          # once: fetch the build container
+
+scripts/pv-build.sh orangepi5b       # Orange Pi 5B
+scripts/pv-build.sh rpi4             # Raspberry Pi 4
+scripts/pv-build.sh qemu-arm64       # QEMU arm64
+scripts/pv-build.sh qemu-x86_64      # QEMU x86_64
 ```
 
-Build host needs `swig` (U-Boot binman for Rockchip).
+| Device | Platform | Image | Also produced |
+|---|---|---|---|
+| `orangepi5b` | v8a | `platform-v8a/images/pv-orangepi5b.img` | `pantavisor-bsp-orangepi5b.pvrexport.tgz` |
+| `rpi4` | v8a | `platform-v8a/images/pv-rpi4.img` | `pantavisor-bsp-rpi4.pvrexport.tgz` |
+| `qemu-arm64` | v8a | `platform-v8a/images/pv-hd.img` | `u-boot.bin`, `pantavisor-bsp.pvrexport.tgz` |
+| `qemu-x86_64` | x86_64 | `platform-x86_64/images/pv-hd.img` | `u-boot.rom`, `pantavisor-bsp.pvrexport.tgz` |
 
-### In the build container
+Each board has its own signed BSP (kernel, initramfs, modules and firmware
+squashfs, and only that board's devicetree) and its own storage partition
+with factory revision 0 (the BSP plus the pv-alpine-connman and pv-pvr-sdk
+containers).
+
+- Options after the device go to PTXdist, e.g. `scripts/pv-build.sh rpi4 -q`
+  for a quiet build.
+- `scripts/pv-build.sh --list` lists the devices.
+- `--no-docker` builds on the host instead, which then needs PTXdist
+  2026.10.0, the OSELAS.Toolchain 2025.11.1 toolchains in `/opt` and `swig`.
+- The workspace has one selected platform at a time, but each platform keeps
+  its own build tree, so switching between devices only rebuilds what
+  changed.
+
+### Choosing boards and containers
+
+Both are menus in PTXdist's configuration:
+
+| What | Command | Menu |
+|---|---|---|
+| Boards built on a platform | `scripts/pv-docker.sh ptxdist menuconfig platform` | Pantavisor boards |
+| Containers in revision 0 | `scripts/pv-docker.sh ptxdist menuconfig` | Pantavisor → containers in revision 0 |
+
+- **Pantavisor boards** lists the boards of the selected platform (v8a:
+  QEMU, Orange Pi 5B, Raspberry Pi 4; x86_64: QEMU). Each enabled board
+  brings in its image, its own BSP and its bootloader, and `ptxdist images`
+  builds all enabled boards. It also holds the boot partition settings
+  shared by the boards (size, OEM kernel arguments). `scripts/pv-build.sh`
+  refuses a device whose board is disabled.
+- **Containers in revision 0** applies to every board: pv-alpine-connman
+  (network), pv-pvr-sdk (SDK shell over SSH; it turns on dm-crypt, since
+  its volume is on the encrypted disk) and a list of extra container
+  pvrexports.
+
+The board menu is per platform: run `scripts/pv-build.sh <device>` (or
+`ptxdist platform configs/platform-<name>/platformconfig`) first to select
+the platform the menu should show. Commit the changed configs and their
+`.diff` files afterwards.
+
+### The build container
 
 `ghcr.io/pantavisor/pv-ptxdist-builder` has PTXdist, the OSELAS toolchains
 and all host dependencies; `docker/Dockerfile` builds it and CI publishes it
-on changes to `docker/`.
+on changes to `docker/`. `scripts/pv-docker.sh` runs anything else in it:
 
 ```sh
-scripts/pv-docker.sh --pull                # fetch the image
-scripts/pv-docker.sh ptxdist images        # run one command
-scripts/pv-docker.sh                       # or a shell
-scripts/pv-docker.sh --build               # build the image locally instead
+scripts/pv-docker.sh --build               # build the container locally instead of pulling
+scripts/pv-docker.sh ptxdist menuconfig    # any PTXdist command
+scripts/pv-docker.sh                       # a shell
 ```
 
 The workspace is mounted at its host path and commands run with your
-uid/gid. The full workflow (first build, daily work, menuconfig, testing,
-options) is in [docs/building-with-docker.md](docs/building-with-docker.md).
-
-Outputs in `platform-v8a/images/`:
-
-- `pantavisor-bsp.pvrexport.tgz`: signed BSP (kernel, initramfs, modules and firmware squashfs)
-- `pv-storage.ext4`: storage partition with factory revision 0 (BSP plus pvr-sdk)
-- `pv-hd.img`: boot vfat plus storage, for QEMU arm64
-- `pv-orangepi5b.img`: Orange Pi 5B SD/eMMC image
-- `pv-rpi4.img`: Raspberry Pi 4 SD image
-
-Build one image only with `ptxdist image <img>` — e.g.
-`scripts/pv-docker.sh ptxdist image pv-orangepi5b.img` — which is what the
-CI does per target.
-
-`platform-x86_64/images/` has the same layout for the QEMU x86_64 target
-(`pv-hd.img` plus `u-boot.rom` as firmware).
+uid/gid. The full workflow (daily work, menuconfig, testing, options) is in
+[docs/building-with-docker.md](docs/building-with-docker.md).
 
 ## Run
 
@@ -121,9 +155,10 @@ Details:
 | `rpi4` | v8a | `pv-rpi4.img` | image + signed BSP |
 | `qemu_x86` | x86_64 | `pv-hd.img` | image, `u-boot.rom` and signed BSP |
 
-Each job runs `ptxdist image <img>` together with
-`pantavisor-bsp.pvrexport.tgz`, so one broken target never blocks the
-others, and runs `actions/cache` on the `src/` download directory.
+Each job runs `ptxdist image <img>`, which also builds the BSP that image
+is made from (the board's own one, or the platform's generic one for QEMU),
+so one broken target never blocks the others. It uploads the image with
+that BSP and caches the `src/` download directory.
 
 Jobs run on the self-hosted `bsp-builder` machines (the fleet label
 meta-pantavisor's `buildkas-target.yaml` uses). Machine requirements:

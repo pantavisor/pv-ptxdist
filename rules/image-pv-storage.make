@@ -27,15 +27,15 @@ IMAGE_PV_STORAGE_PANTAHUB_CONFIG := $(firstword $(wildcard \
 	$(PTXDIST_WORKSPACE)/configs/pantavisor/pantahub.config))
 
 IMAGE_PV_STORAGE_USER_CONTAINERS := $(foreach c, \
-	$(call remove_quotes, $(PTXCONF_IMAGE_PV_STORAGE_CONTAINERS)), \
+	$(call remove_quotes, $(PTXCONF_PV_CONTAINERS_EXTRA)), \
 	$(if $(filter /%,$(c)),$(c),$(PTXDIST_WORKSPACE)/$(c)))
 
 # Containers from host packages are ordered by their install stamps; their
 # sysroot files have no make rule, so they must not be prerequisites.
 IMAGE_PV_STORAGE_CONTAINERS := \
-	$(call ptx/ifdef, PTXCONF_IMAGE_PV_STORAGE_ALPINE_CONNMAN, \
+	$(call ptx/ifdef, PTXCONF_PV_CONTAINER_ALPINE_CONNMAN, \
 		$(PTXDIST_SYSROOT_HOST)/usr/share/pantavisor/containers/pv-alpine-connman.pvrexport.tgz) \
-	$(call ptx/ifdef, PTXCONF_IMAGE_PV_STORAGE_PVR_SDK, \
+	$(call ptx/ifdef, PTXCONF_PV_CONTAINER_PVR_SDK, \
 		$(PTXDIST_SYSROOT_HOST)/usr/share/pantavisor/containers/pv-pvr-sdk.pvrexport.tgz) \
 	$(IMAGE_PV_STORAGE_USER_CONTAINERS)
 
@@ -51,9 +51,9 @@ IMAGE_PV_STORAGE_ENV := \
 IMAGE_PV_STORAGE_DEPS := \
 	$(STATEDIR)/host-pvr.install.post \
 	$(STATEDIR)/host-pv-developer-ca.install.post \
-	$(call ptx/ifdef, PTXCONF_IMAGE_PV_STORAGE_ALPINE_CONNMAN, \
+	$(call ptx/ifdef, PTXCONF_PV_CONTAINER_ALPINE_CONNMAN, \
 		$(STATEDIR)/host-pv-alpine-connman.install.post) \
-	$(call ptx/ifdef, PTXCONF_IMAGE_PV_STORAGE_PVR_SDK, \
+	$(call ptx/ifdef, PTXCONF_PV_CONTAINER_PVR_SDK, \
 		$(STATEDIR)/host-pv-pvr-sdk.install.post) \
 	$(IMAGE_PV_STORAGE_USER_CONTAINERS)
 

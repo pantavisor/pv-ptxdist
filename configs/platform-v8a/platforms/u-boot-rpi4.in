@@ -2,11 +2,12 @@
 
 config U_BOOT_RPI4
 	tristate
-	prompt "U-Boot (Raspberry Pi 4)"
 	select U_BOOT			if BUILDTIME
 	# mkimage includes <openssl/evp.h> (CONFIG_TOOLS_LIBCRYPTO)
 	select HOST_OPENSSL
 	help
+	  Selected by its board in Pantavisor boards.
+
 	  Mainline U-Boot for the Raspberry Pi 4 (rpi_4_defconfig), built
 	  from the U-Boot version selected for the platform. The GPU
 	  firmware loads it as the kernel: images/u-boot-rpi4.bin.

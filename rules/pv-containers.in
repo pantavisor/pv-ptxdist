@@ -1,0 +1,34 @@
+## SECTION=pantavisor
+
+menu "containers in revision 0      "
+	depends on PANTAVISOR
+
+config PV_CONTAINER_ALPINE_CONNMAN
+	bool
+	select HOST_PV_ALPINE_CONNMAN
+	prompt "pv-alpine-connman (network)"
+	default y
+	help
+	  ConnMan network manager. Without a container that configures
+	  the network, the device cannot reach Pantahub.
+
+config PV_CONTAINER_PVR_SDK
+	bool
+	select HOST_PV_PVR_SDK
+	# its volume lives on the encrypted dm-versatile disk
+	select PANTAVISOR_DM_CRYPT
+	prompt "pv-pvr-sdk (SDK shell over SSH)"
+	default y
+	help
+	  SDK shell with pvr, reachable over SSH with the keys in the
+	  device's pvr-sdk.authorized_keys user-meta.
+
+config PV_CONTAINERS_EXTRA
+	string
+	prompt "more container pvrexports"
+	help
+	  Space separated paths, absolute or relative to the BSP, of
+	  further container .pvrexport.tgz files deployed into the
+	  factory revision.
+
+endmenu

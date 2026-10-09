@@ -47,43 +47,42 @@ build machine needs are Docker and git.
    scripts/pv-docker.sh --build
    ```
 
-3. Select the configuration. This only creates the `selected_*` symlinks in
-   the workspace, so it is needed once per clone:
+3. Build a device:
 
    ```sh
-   scripts/pv-docker.sh sh -c '
-   	ptxdist select configs/ptxconfig &&
-   	ptxdist platform configs/platform-v8a/platformconfig &&
-   	ptxdist toolchain /opt/OSELAS.Toolchain-2025.11.1/aarch64-v8a-linux-gnu/gcc-15.2.1-clang-21.1.8-glibc-2.42-binutils-2.45.1-kernel-6.17.6-sanitized/bin'
+   scripts/pv-build.sh orangepi5b       # or rpi4, qemu-arm64, qemu-x86_64
    ```
 
-4. Build:
+   `scripts/pv-build.sh` selects the device's platform and toolchain in the
+   workspace and builds only that device's image, plus everything the image
+   needs. A first build takes a while and downloads the sources into
+   `src/`. It ends by listing what it produced:
 
-   ```sh
-   scripts/pv-docker.sh ptxdist -j$(nproc) images
-   ```
+   | Device | Image | Also produced |
+   |---|---|---|
+   | `orangepi5b` | `platform-v8a/images/pv-orangepi5b.img` | `pantavisor-bsp-orangepi5b.pvrexport.tgz` |
+   | `rpi4` | `platform-v8a/images/pv-rpi4.img` | `pantavisor-bsp-rpi4.pvrexport.tgz` |
+   | `qemu-arm64` | `platform-v8a/images/pv-hd.img` | `u-boot.bin`, `pantavisor-bsp.pvrexport.tgz` |
+   | `qemu-x86_64` | `platform-x86_64/images/pv-hd.img` | `u-boot.rom`, `pantavisor-bsp.pvrexport.tgz` |
 
-   A first build takes a while and downloads the sources into `src/`. The
-   results are in `platform-v8a/images/`:
-
-   | File | What |
-   |---|---|
-   | `pv-hd.img` | QEMU arm64 disk: boot partition plus storage |
-   | `pv-orangepi5b.img` | Orange Pi 5B SD card / eMMC image |
-   | `pv-rpi4.img` | Raspberry Pi 4 SD card image |
-   | `pantavisor-bsp.pvrexport.tgz` | Signed BSP, for updates through Pantahub |
-   | `pv-storage.ext4` | Storage partition with factory revision 0 |
-   | `u-boot.bin` | U-Boot for QEMU (`-bios`) |
+   The `.pvrexport.tgz` is the device's signed BSP, for updates through
+   Pantahub. Options after the device go to PTXdist
+   (`scripts/pv-build.sh rpi4 -q`), and `scripts/pv-build.sh --list` lists
+   the devices.
 
 ## Daily work
 
-Run any PTXdist command through the script. It stays in the current
-directory when that is inside the workspace.
+Rebuild a device's image after a change with the same command,
+`scripts/pv-build.sh <device>`. Switching to a device of another platform
+keeps the other platform's build tree, so going back later is quick.
+
+Any other PTXdist command runs through `scripts/pv-docker.sh`, in the
+platform the last `pv-build.sh` selected. It stays in the current directory
+when that is inside the workspace.
 
 ```sh
-scripts/pv-docker.sh ptxdist clean pantavisor      # rebuild one package
-scripts/pv-docker.sh ptxdist targetinstall pantavisor
-scripts/pv-docker.sh ptxdist images                # regenerate the images
+scripts/pv-docker.sh ptxdist clean pantavisor      # force one package to rebuild
+scripts/pv-build.sh orangepi5b                     # then the image again
 ```
 
 Kconfig menus work as well, since the script passes the terminal through:
@@ -96,6 +95,11 @@ scripts/pv-docker.sh ptxdist menuconfig u-boot-orangepi5b
 scripts/pv-docker.sh ptxdist menuconfig u-boot-rpi4
 ```
 
+Which boards a platform builds is the Pantavisor boards menu of
+`ptxdist menuconfig platform`; which containers go into revision 0 is
+Pantavisor → containers in revision 0 in `ptxdist menuconfig` (see
+"Choosing boards and containers" in the README).
+
 Configs are deltas to `base/`: commit both the config and its `.diff`
 afterwards (see "Changing configs" in the README).
 
@@ -104,8 +108,8 @@ For several commands in a row, open a shell instead:
 ```sh
 scripts/pv-docker.sh
 # now inside the container, in the workspace
-ptxdist go
-ptxdist images
+ptxdist targetinstall pantavisor
+ptxdist image pv-orangepi5b.img
 exit
 ```
 

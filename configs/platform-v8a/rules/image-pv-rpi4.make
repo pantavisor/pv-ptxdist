@@ -35,7 +35,7 @@ IMAGE_PV_RPI4_BSP	:= $(IMAGEDIR)/pantavisor-bsp-rpi4.pvrexport.tgz
 IMAGE_PV_RPI4_DTBS	:= broadcom/bcm2711-rpi-4-b.dtb
 
 IMAGE_PV_RPI4_ENV := \
-	BOOT_SIZE=$(call remove_quotes, $(PTXCONF_IMAGE_PV_HD_BOOT_SIZE)) \
+	BOOT_SIZE=$(call remove_quotes, $(PTXCONF_IMAGE_PV_BOOT_SIZE)) \
 	STORAGE_SIZE=$(call remove_quotes, $(PTXCONF_IMAGE_PV_STORAGE_SIZE))
 
 # ----------------------------------------------------------------------------
@@ -54,7 +54,7 @@ $(IMAGE_PV_RPI4_BSP): \
 $(IMAGE_PV_RPI4_FILES): \
 		$(IMAGE_PV_STORAGE_DEPS) \
 		$(IMAGE_PV_RPI4_BSP) \
-		$(IMAGE_PV_HD_FILES) \
+		$(IMAGE_PV_BOOT_TGZ) \
 		$(STATEDIR)/u-boot-rpi4.targetinstall \
 		$(IMAGEDIR)/bcm2711-rpi-4-b.dtb \
 		$(call ptx/in-platformconfigdir, rpi4/config.txt) \
@@ -64,7 +64,7 @@ $(IMAGE_PV_RPI4_FILES): \
 		$(IMAGE_PV_RPI4_WORKDIR)/storage, $(IMAGE_PV_RPI4_BSP))
 	@rm -rf $(IMAGE_PV_RPI4_WORKDIR)/root
 	@mkdir -p $(IMAGE_PV_RPI4_WORKDIR)/root/storage
-	@tar -C $(IMAGE_PV_RPI4_WORKDIR)/root -xzf $(IMAGE_PV_HD_FILES)
+	@tar -C $(IMAGE_PV_RPI4_WORKDIR)/root -xzf $(IMAGE_PV_BOOT_TGZ)
 	@install -m 0644 \
 		$(IMAGE_PV_RPI4_FIRMWARE) \
 		$(IMAGEDIR)/u-boot-rpi4.bin \

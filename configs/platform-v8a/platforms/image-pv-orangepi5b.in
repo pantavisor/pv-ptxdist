@@ -1,11 +1,11 @@
-## SECTION=image
+## SECTION=pv_boards
 
 config IMAGE_PV_ORANGEPI5B
 	tristate
 	select HOST_GENIMAGE
-	select IMAGE_PV_HD
+	select IMAGE_PV_BOOT
 	select U_BOOT_ORANGEPI5B
-	prompt "Generate images/pv-orangepi5b.img"
+	prompt "Orange Pi 5B (images/pv-orangepi5b.img)"
 	help
 	  Pantavisor SD card / eMMC image for the Orange Pi 5B: U-Boot
 	  at 32 KiB, a boot partition with boot.scr and a storage

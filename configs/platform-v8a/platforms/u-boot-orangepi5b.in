@@ -2,7 +2,6 @@
 
 config U_BOOT_ORANGEPI5B
 	tristate
-	prompt "U-Boot (Orange Pi 5B)"
 	select U_BOOT			if BUILDTIME
 	select TF_A
 	select RKBIN_RK3588
@@ -12,6 +11,8 @@ config U_BOOT_ORANGEPI5B
 	# mkimage includes <openssl/evp.h> (CONFIG_TOOLS_LIBCRYPTO)
 	select HOST_OPENSSL
 	help
+	  Selected by its board in Pantavisor boards.
+
 	  Mainline U-Boot for the Orange Pi 5B (RK3588S), built from the
 	  U-Boot version selected for the platform with TF-A BL31 and the
 	  rkbin DDR blob. Produces images/u-boot-rockchip-orangepi5b.bin,

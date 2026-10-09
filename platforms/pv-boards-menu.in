@@ -1,0 +1,5 @@
+## SECTION=platform_project_specific
+
+menu "Pantavisor boards             "
+source "generated/pv_boards.in"
+endmenu
