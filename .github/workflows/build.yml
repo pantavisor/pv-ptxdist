@@ -10,7 +10,10 @@ on:
 jobs:
   build:
     name: ${{ matrix.platform }}
-    runs-on: [self-hosted, Linux, builder]
+    # The fleet label meta-pantavisor's buildkas-target.yaml workflow uses:
+    # job only matches the dedicated builder machines, not the generic
+    # org-level runners.
+    runs-on: ["bsp-builder"]
     timeout-minutes: 360
     permissions:
       contents: read
@@ -61,6 +64,14 @@ jobs:
           getent group docker >/dev/null && usermod -aG docker builder || true
           flock -u 9
           id -u builder
+          # ptxdist creates the selected_* links by absolute path, so uid
+          # 'builder' must reach the workspace on the host: runner homes are
+          # roamed 750 in some installs.
+          p="$(dirname "$GITHUB_WORKSPACE")"
+          for _ in 1 2 3 4; do
+            chmod a+x "$p" 2>/dev/null || true
+            p="$(dirname "$p")"
+          done
           chown -R builder:builder .
 
       - name: Log in to ghcr.io
