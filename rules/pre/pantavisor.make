@@ -27,12 +27,14 @@ IMAGE_PV_BSP_FDT	:= $(call remove_quotes, $(PTXCONF_IMAGE_PV_BSP_FDT))
 #
 # PTXdist only orders the selected host packages before the final image
 # targets, not before helper targets, so these list them themselves.
-# Recursive: the root-cpio rules are read after this file.
-IMAGE_PV_BSP_DEPS = \
+# The initramfs is named here rather than through IMAGE_ROOT_CPIO_IMAGE: the
+# image-root-cpio rules are read after the board rules, whose prerequisite
+# lists expand on reading, so the variable would still be empty there.
+IMAGE_PV_BSP_DEPS := \
 	$(STATEDIR)/host-pvr.install.post \
 	$(STATEDIR)/host-pv-developer-ca.install.post \
 	$(STATEDIR)/host-squashfs-tools.install.post \
-	$(IMAGE_ROOT_CPIO_IMAGE) \
+	$(IMAGEDIR)/root.cpio$(call remove_quotes, $(PTXCONF_IMAGE_ROOT_CPIO_COMPRESSION_SUFFIX)) \
 	$(IMAGEDIR)/linuximage
 
 # Board image rules build their own BSP with only their device tree:

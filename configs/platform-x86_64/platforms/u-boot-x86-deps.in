@@ -1,0 +1,12 @@
+## SECTION=bootloader
+
+config PV_U_BOOT_X86_DEPS
+	bool
+	default y
+	depends on U_BOOT
+	select HOST_SYSTEM_PYTHON3_SETUPTOOLS
+	select HOST_SYSTEM_PYTHON3_DEV
+	help
+	  qemu-x86_64's binman builds U-Boot's pylibfdt, which needs
+	  setuptools and the Python headers. PTXdist's u-boot rule does not
+	  depend on them.

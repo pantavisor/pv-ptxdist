@@ -2,6 +2,10 @@
 
 config IMAGE_PV_HD
 	bool
+	# PTXdist orders the image after what this entry itself selects
+	select HOST_GENIMAGE
+	select HOST_DOSFSTOOLS
+	select HOST_MTOOLS
 	select IMAGE_PV_BOOT
 	select IMAGE_PV_STORAGE
 	prompt "QEMU (images/pv-hd.img)      "

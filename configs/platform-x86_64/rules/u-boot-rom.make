@@ -14,6 +14,10 @@ $(IMAGEDIR)/u-boot.rom: $(STATEDIR)/u-boot.targetinstall
 	@install -m 0644 $(U_BOOT_BUILD_DIR)/u-boot.rom $@
 
 $(IMAGEDIR)/pv-hd.img: $(IMAGEDIR)/u-boot.rom
+
+# See PV_U_BOOT_X86_DEPS: without this, a parallel build can reach U-Boot's
+# pylibfdt before setuptools is installed.
+$(STATEDIR)/u-boot.compile: $(STATEDIR)/host-system-python3-setuptools.install.post
 endif
 
 # vim: syntax=make

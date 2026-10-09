@@ -2,6 +2,9 @@
 
 config IMAGE_PV_STORAGE
 	tristate
+	# PTXdist orders the image after what this entry itself selects
+	select HOST_GENIMAGE
+	select HOST_E2FSPROGS
 	select IMAGE_PV_BSP
 	help
 	  The platform's generic storage partition, images/pv-storage.ext4

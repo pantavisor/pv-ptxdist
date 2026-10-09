@@ -2,6 +2,10 @@
 
 config IMAGE_PV_ORANGEPI5
 	bool
+	# PTXdist orders the image after what this entry itself selects
+	select HOST_DOSFSTOOLS
+	select HOST_MTOOLS
+	select HOST_E2FSPROGS
 	select HOST_GENIMAGE
 	select IMAGE_PV_BOOT
 	select U_BOOT_ORANGEPI5
