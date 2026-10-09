@@ -1,19 +1,32 @@
-## SECTION=pv_boards
+## SECTION=pv_boards_options
 
 config IMAGE_PV_BOOT
 	bool
+	select HOST_PVR
+	select HOST_PV_DEVELOPER_CA
+	select HOST_SQUASHFS_TOOLS
+	select HOST_SQUASHFS_TOOLS_XZ_SUPPORT
+	select HOST_SQUASHFS_TOOLS_LZ4_SUPPORT
+	select HOST_SQUASHFS_TOOLS_ZSTD_SUPPORT
 	select HOST_GENIMAGE
+	select HOST_E2FSPROGS
 	select HOST_DOSFSTOOLS
 	select HOST_MTOOLS
 	select HOST_U_BOOT_TOOLS
-	select IMAGE_PV_STORAGE
+	select IMAGE_ROOT_CPIO
+	select IMAGE_KERNEL
+	select KERNEL
 	help
-	  Selected by the boards: the vfat boot partition with the U-Boot
-	  boot script (boot.scr) and oemEnv.txt that all of them carry.
+	  Selected by every board: what all Pantavisor images are made of.
+	  Each board image carries a BSP (kernel, the root filesystem as
+	  initramfs, modules and firmware as squashfs, signed with pvr),
+	  a storage partition with factory revision 0 and a vfat boot
+	  partition with the U-Boot boot script. The root filesystem
+	  image must be gzip compressed.
 
 if IMAGE_PV_BOOT
 
-comment "boot partition (all boards)"
+comment "settings for all boards"
 
 config IMAGE_PV_BOOT_SIZE
 	string
@@ -33,5 +46,49 @@ config IMAGE_PV_BOOT_OEMARGS
 	help
 	  Appended to the kernel command line through oemEnv.txt
 	  (${oemargs} in boot.scr).
+
+config IMAGE_PV_STORAGE_SIZE
+	string
+	prompt "storage partition size"
+	default "1G"
+	help
+	  pv_e2fsgrow grows the partition to fill the disk on first boot.
+
+choice
+	prompt "bootloader integration"
+	default IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
+
+config IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
+	bool
+	prompt "U-Boot (boot/uboot.txt)"
+
+config IMAGE_PV_STORAGE_BOOTLOADER_GRUB
+	bool
+	prompt "GRUB"
+
+config IMAGE_PV_STORAGE_BOOTLOADER_RPIAB
+	bool
+	prompt "Raspberry Pi tryboot A/B"
+
+endchoice
+
+config IMAGE_PV_STORAGE_BOOTLOADER
+	string
+	default "uboot" if IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
+	default "grub" if IMAGE_PV_STORAGE_BOOTLOADER_GRUB
+	default "rpiab" if IMAGE_PV_STORAGE_BOOTLOADER_RPIAB
+
+config IMAGE_PV_BSP_FDT
+	string
+	prompt "device tree to ship as initial fdt"
+	help
+	  File name in the images directory, shipped as the BSP's initial
+	  fdt. Leave empty: the board images ship their own devicetree,
+	  which boot.scr finds by U-Boot's fdtfile, and QEMU provides one.
+
+config IMAGE_PV_BSP_SQUASHFS_OPTS
+	string
+	prompt "mksquashfs compression options"
+	default "-comp xz"
 
 endif

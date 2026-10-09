@@ -32,34 +32,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # One job per target: builds and artifact only that image plus the
-          # signed BSP it was made from ('ptxdist image <img>' builds the
-          # BSP too). The boards have their own BSP with only their
-          # devicetree; QEMU uses the platform's generic one.
+          # One job per device: builds and uploads only that image plus the
+          # signed BSP it was made from. The boards have their own BSP with
+          # only their devicetree; QEMU uses the platform's generic one.
           - name: orangepi5b
+            device: orangepi5b
             platform: v8a
-            toolchain: aarch64-v8a-linux-gnu
-            image_targets: pv-orangepi5b.img
             upload: |
               platform-v8a/images/pv-orangepi5b.img
               platform-v8a/images/pantavisor-bsp-orangepi5b.pvrexport.tgz
           - name: rpi4
+            device: rpi4
             platform: v8a
-            toolchain: aarch64-v8a-linux-gnu
-            image_targets: pv-rpi4.img
             upload: |
               platform-v8a/images/pv-rpi4.img
               platform-v8a/images/pantavisor-bsp-rpi4.pvrexport.tgz
           - name: qemu_x86
+            device: qemu-x86_64
             platform: x86_64
-            toolchain: x86_64-unknown-linux-gnu
-            image_targets: pv-hd.img
             upload: |
               platform-x86_64/images/pv-hd.img
               platform-x86_64/images/u-boot.rom
               platform-x86_64/images/pantavisor-bsp.pvrexport.tgz
-    env:
-      TOOLCHAIN: /opt/OSELAS.Toolchain-2025.11.1/${{ matrix.toolchain }}/gcc-15.2.1-clang-21.1.8-glibc-2.42-binutils-2.45.1-kernel-6.17.6-sanitized/bin
     steps:
       # A platform build tree is ~10 GB on top of the 5.7 GB build image.
       - uses: actions/checkout@v4
@@ -124,20 +118,11 @@ jobs:
       - name: Pull the build image
         run: sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh --pull
 
-      # Downloads only; the build itself always starts clean.
-      - name: Select the platform
-        run: sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh sh -c "
-          ptxdist select configs/ptxconfig &&
-          ptxdist platform configs/platform-${{ matrix.platform }}/platformconfig &&
-          ptxdist toolchain ${TOOLCHAIN}"
-
-      # 'ptxdist image <img>' builds all stages it depends on, the BSP
-      # included.
+      # scripts/pv-build.sh selects the device's platform, toolchain and
+      # board (the platform's Pantavisor boards choice), then builds its
+      # image with everything it needs, the BSP included.
       - name: Build
-        run: |
-          for t in ${{ matrix.image_targets }}; do
-            sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh sh -c "ptxdist -q -j\$(nproc) image ${t}"
-          done
+        run: sudo -E -H -u "$BUILD_USER" scripts/pv-build.sh ${{ matrix.device }} -q
 
       - uses: actions/upload-artifact@v4
         with:

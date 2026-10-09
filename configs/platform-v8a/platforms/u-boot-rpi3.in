@@ -1,0 +1,13 @@
+## SECTION=bootloader
+
+config U_BOOT_RPI3
+	tristate
+	select U_BOOT			if BUILDTIME
+	# mkimage includes <openssl/evp.h> (CONFIG_TOOLS_LIBCRYPTO)
+	select HOST_OPENSSL
+	help
+	  Selected by its board in Pantavisor boards.
+
+	  Mainline U-Boot for the Raspberry Pi 3B+ (rpi_3_b_plus_defconfig), built
+	  from the U-Boot version selected for the platform. The GPU
+	  firmware loads it as the kernel: images/u-boot-rpi3.bin.

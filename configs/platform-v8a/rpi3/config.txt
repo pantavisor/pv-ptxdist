@@ -1,0 +1,7 @@
+# The firmware loads bcm2837-rpi-3-b-plus.dtb (upstream name) from this
+# partition and hands it to U-Boot, which boots the kernel with it.
+upstream_kernel=1
+arm_64bit=1
+# mini UART on GPIO 14/15: the console (ttyS1)
+enable_uart=1
+kernel=u-boot-rpi3.bin

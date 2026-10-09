@@ -1,8 +1,9 @@
 ## SECTION=pv_boards
 
 config IMAGE_PV_HD
-	tristate
+	bool
 	select IMAGE_PV_BOOT
+	select IMAGE_PV_STORAGE
 	prompt "QEMU (images/pv-hd.img)      "
 	help
 	  Bootable Pantavisor disk for QEMU: the boot partition followed

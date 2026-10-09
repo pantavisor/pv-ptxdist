@@ -1,5 +1,5 @@
 59d5f5e7e42a01594196dd85f3298e87
-beebfb46ab4a8a8d4c5e2030adab7740
+d7fa6048b8344745a7d23a2d446824da
 # PTXCONF_BAREBOX is not set
 # PTXCONF_BAREBOX_BAREBOXCRC32 is undefined
 # PTXCONF_BAREBOX_BAREBOXENV is undefined
@@ -61,15 +61,13 @@ PTXCONF_IMAGE_PV_BOOT=y
 PTXCONF_IMAGE_PV_BOOT_EXTRA_FILES=""
 PTXCONF_IMAGE_PV_BOOT_OEMARGS=""
 PTXCONF_IMAGE_PV_BOOT_SIZE="64M"
-PTXCONF_IMAGE_PV_BSP=y
-PTXCONF_IMAGE_PV_BSP_DTBS=""
 PTXCONF_IMAGE_PV_BSP_FDT=""
-PTXCONF_IMAGE_PV_BSP_FIRMWARE_PKGS=""
 PTXCONF_IMAGE_PV_BSP_SQUASHFS_OPTS="-comp xz"
-PTXCONF_IMAGE_PV_HD=y
+# PTXCONF_IMAGE_PV_HD is not set
+# PTXCONF_IMAGE_PV_ORANGEPI5 is not set
 PTXCONF_IMAGE_PV_ORANGEPI5B=y
-PTXCONF_IMAGE_PV_RPI4=y
-PTXCONF_IMAGE_PV_STORAGE=y
+# PTXCONF_IMAGE_PV_RPI3 is not set
+# PTXCONF_IMAGE_PV_RPI4 is not set
 PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER="uboot"
 # PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER_GRUB is not set
 # PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER_RPIAB is not set
@@ -97,7 +95,7 @@ PTXCONF_IMAGE_ROOT_CPIO_COMPRESSION_UTIL="gzip"
 # PTXCONF_IMAGE_ROOT_EXT_TYPE is undefined
 # PTXCONF_IMAGE_TQ_MBA8MPXL is not set
 # PTXCONF_IMAGE_TQ_MBA93XXCA is not set
-PTXCONF_KERNEL_DTS="armada-3720-community.dts freescale/imx8mm-evk.dts freescale/imx8mn-ddr4-evk.dts freescale/imx8mp-evk.dts freescale/imx8mq-evk.dts rockchip/rk3568-rock-3a.dts freescale/imx8mp-tqma8mpql-mba8mpxl.dts freescale/imx93-tqma9352-mba93xxca.dts ti/k3-am625-beagleplay.dts imx93-11x11-frdm.dts rockchip/rk3588s-orangepi-5b.dts broadcom/bcm2711-rpi-4-b.dts"
+PTXCONF_KERNEL_DTS="armada-3720-community.dts freescale/imx8mm-evk.dts freescale/imx8mn-ddr4-evk.dts freescale/imx8mp-evk.dts freescale/imx8mq-evk.dts rockchip/rk3568-rock-3a.dts freescale/imx8mp-tqma8mpql-mba8mpxl.dts freescale/imx93-tqma9352-mba93xxca.dts ti/k3-am625-beagleplay.dts imx93-11x11-frdm.dts rockchip/rk3588s-orangepi-5b.dts broadcom/bcm2711-rpi-4-b.dts broadcom/bcm2837-rpi-3-b-plus.dts rockchip/rk3588s-orangepi-5.dts"
 PTXCONF_RKBIN_RK3588=y
 PTXCONF_TF_A_ARTIFACTS="bl31/bl31.elf"
 PTXCONF_TF_A_EXTRA_ARGS=""
@@ -133,6 +131,5 @@ PTXCONF_U_BOOT_MD5="336d4cb1452f2ed70da86da2d8560060"
 # PTXCONF_U_BOOT_NEEDS_HOST_LIBUUID is not set
 PTXCONF_U_BOOT_NEEDS_HOST_OPENSSL=y
 PTXCONF_U_BOOT_ORANGEPI5B=y
-PTXCONF_U_BOOT_RPI4=y
 # PTXCONF_U_BOOT_VERIFY_SIGNATURE is not set
 PTXCONF_U_BOOT_VERSION="2026.07"

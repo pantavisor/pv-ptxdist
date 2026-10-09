@@ -1,0 +1,17 @@
+## SECTION=pv_boards
+
+config IMAGE_PV_RPI3
+	bool
+	select HOST_GENIMAGE
+	select HOST_DOSFSTOOLS
+	select HOST_MTOOLS
+	select IMAGE_PV_BOOT
+	select U_BOOT_RPI3
+	prompt "Raspberry Pi 3B+ (images/pv-rpi3.img)"
+	help
+	  Pantavisor SD card image for the Raspberry Pi 3B+: a vfat boot
+	  partition with the GPU firmware, config.txt, the devicetree,
+	  U-Boot and boot.scr, then the storage partition. Its BSP
+	  (images/pantavisor-bsp-rpi3.pvrexport.tgz) carries only
+	  broadcom/bcm2837-rpi-3-b-plus.dtb, which must be in the kernel's
+	  devicetree list.

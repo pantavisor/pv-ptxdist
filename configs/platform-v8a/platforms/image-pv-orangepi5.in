@@ -1,0 +1,14 @@
+## SECTION=pv_boards
+
+config IMAGE_PV_ORANGEPI5
+	bool
+	select HOST_GENIMAGE
+	select IMAGE_PV_BOOT
+	select U_BOOT_ORANGEPI5
+	prompt "Orange Pi 5 (images/pv-orangepi5.img)"
+	help
+	  Pantavisor SD card image for the Orange Pi 5: U-Boot
+	  at 32 KiB, a boot partition with boot.scr and a storage
+	  partition. Its BSP (images/pantavisor-bsp-orangepi5.pvrexport.tgz)
+	  carries only rockchip/rk3588s-orangepi-5.dtb, which must be in
+	  the kernel's devicetree list.

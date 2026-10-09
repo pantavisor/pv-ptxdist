@@ -39,7 +39,9 @@ device's image and everything it needs:
 git clone --recursive git@github.com:pantavisor/pv-ptxdist.git && cd pv-ptxdist
 scripts/pv-docker.sh --pull          # once: fetch the build container
 
+scripts/pv-build.sh orangepi5        # Orange Pi 5
 scripts/pv-build.sh orangepi5b       # Orange Pi 5B
+scripts/pv-build.sh rpi3             # Raspberry Pi 3B+
 scripts/pv-build.sh rpi4             # Raspberry Pi 4
 scripts/pv-build.sh qemu-arm64       # QEMU arm64
 scripts/pv-build.sh qemu-x86_64      # QEMU x86_64
@@ -47,7 +49,9 @@ scripts/pv-build.sh qemu-x86_64      # QEMU x86_64
 
 | Device | Platform | Image | Also produced |
 |---|---|---|---|
+| `orangepi5` | v8a | `platform-v8a/images/pv-orangepi5.img` | `pantavisor-bsp-orangepi5.pvrexport.tgz` |
 | `orangepi5b` | v8a | `platform-v8a/images/pv-orangepi5b.img` | `pantavisor-bsp-orangepi5b.pvrexport.tgz` |
+| `rpi3` | v8a | `platform-v8a/images/pv-rpi3.img` | `pantavisor-bsp-rpi3.pvrexport.tgz` |
 | `rpi4` | v8a | `platform-v8a/images/pv-rpi4.img` | `pantavisor-bsp-rpi4.pvrexport.tgz` |
 | `qemu-arm64` | v8a | `platform-v8a/images/pv-hd.img` | `u-boot.bin`, `pantavisor-bsp.pvrexport.tgz` |
 | `qemu-x86_64` | x86_64 | `platform-x86_64/images/pv-hd.img` | `u-boot.rom`, `pantavisor-bsp.pvrexport.tgz` |
@@ -72,15 +76,16 @@ Both are menus in PTXdist's configuration:
 
 | What | Command | Menu |
 |---|---|---|
-| Boards built on a platform | `scripts/pv-docker.sh ptxdist menuconfig platform` | Pantavisor boards |
+| The board a platform builds | `scripts/pv-docker.sh ptxdist menuconfig platform` | Pantavisor boards |
 | Containers in revision 0 | `scripts/pv-docker.sh ptxdist menuconfig` | Pantavisor → containers in revision 0 |
 
-- **Pantavisor boards** lists the boards of the selected platform (v8a:
-  QEMU, Orange Pi 5B, Raspberry Pi 4; x86_64: QEMU). Each enabled board
-  brings in its image, its own BSP and its bootloader, and `ptxdist images`
-  builds all enabled boards. It also holds the boot partition settings
-  shared by the boards (size, OEM kernel arguments). `scripts/pv-build.sh`
-  refuses a device whose board is disabled.
+- **Pantavisor boards** is a choice: the one board the selected platform
+  builds (v8a: QEMU, Orange Pi 5, Orange Pi 5B, Raspberry Pi 3B+,
+  Raspberry Pi 4; x86_64: QEMU). The board brings in its image, its own
+  BSP and its bootloader, so `ptxdist images` builds only that board. The
+  menu also holds the settings all boards share: boot and storage partition
+  size, OEM kernel arguments, bootloader integration, squashfs compression.
+  `scripts/pv-build.sh <device>` selects the board itself.
 - **Containers in revision 0** applies to every board: pv-alpine-connman
   (network), pv-pvr-sdk (SDK shell over SSH; it turns on dm-crypt, since
   its volume is on the encrypted disk) and a list of extra container
@@ -88,8 +93,10 @@ Both are menus in PTXdist's configuration:
 
 The board menu is per platform: run `scripts/pv-build.sh <device>` (or
 `ptxdist platform configs/platform-<name>/platformconfig`) first to select
-the platform the menu should show. Commit the changed configs and their
-`.diff` files afterwards.
+the platform the menu should show. Choosing a board, in the menu or with
+`pv-build.sh`, changes `configs/platform-<name>/platformconfig` and its
+`.diff`: commit them to make it the platform's default board (v8a ships
+with the Orange Pi 5B), or revert them.
 
 ### The build container
 
@@ -155,9 +162,10 @@ Details:
 | `rpi4` | v8a | `pv-rpi4.img` | image + signed BSP |
 | `qemu_x86` | x86_64 | `pv-hd.img` | image, `u-boot.rom` and signed BSP |
 
-Each job runs `ptxdist image <img>`, which also builds the BSP that image
-is made from (the board's own one, or the platform's generic one for QEMU),
-so one broken target never blocks the others. It uploads the image with
+Each job runs `scripts/pv-build.sh <device>`, which selects the board and
+builds its image together with the BSP it is made from (the board's own
+one, or the platform's generic one for QEMU), so one broken target never
+blocks the others. It uploads the image with
 that BSP and caches the `src/` download directory.
 
 Jobs run on the self-hosted `bsp-builder` machines (the fleet label

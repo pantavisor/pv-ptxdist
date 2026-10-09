@@ -1,7 +1,7 @@
 ## SECTION=pv_boards
 
 config IMAGE_PV_ORANGEPI5B
-	tristate
+	bool
 	select HOST_GENIMAGE
 	select IMAGE_PV_BOOT
 	select U_BOOT_ORANGEPI5B

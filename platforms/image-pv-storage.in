@@ -1,48 +1,9 @@
 ## SECTION=image
 
-menuconfig IMAGE_PV_STORAGE
+config IMAGE_PV_STORAGE
 	tristate
-	select HOST_GENIMAGE
-	select HOST_E2FSPROGS
 	select IMAGE_PV_BSP
-	prompt "Generate images/pv-storage.ext4"
 	help
-	  The Pantavisor storage partition (ext4, label "root") with
-	  factory revision 0: the BSP plus the containers chosen in
-	  'ptxdist menuconfig' (Pantavisor -> containers in revision 0),
-	  deployed into trails/0.
-
-if IMAGE_PV_STORAGE
-
-choice
-	prompt "bootloader integration"
-	default IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
-
-config IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
-	bool
-	prompt "U-Boot (boot/uboot.txt)"
-
-config IMAGE_PV_STORAGE_BOOTLOADER_GRUB
-	bool
-	prompt "GRUB"
-
-config IMAGE_PV_STORAGE_BOOTLOADER_RPIAB
-	bool
-	prompt "Raspberry Pi tryboot A/B"
-
-endchoice
-
-config IMAGE_PV_STORAGE_BOOTLOADER
-	string
-	default "uboot" if IMAGE_PV_STORAGE_BOOTLOADER_UBOOT
-	default "grub" if IMAGE_PV_STORAGE_BOOTLOADER_GRUB
-	default "rpiab" if IMAGE_PV_STORAGE_BOOTLOADER_RPIAB
-
-config IMAGE_PV_STORAGE_SIZE
-	string
-	prompt "partition size"
-	default "1G"
-	help
-	  pv_e2fsgrow grows the partition to fill the disk on first boot.
-
-endif
+	  The platform's generic storage partition, images/pv-storage.ext4
+	  (ext4, label "root"), with factory revision 0 built from the
+	  generic BSP. QEMU's pv-hd.img uses it; the boards build their own.

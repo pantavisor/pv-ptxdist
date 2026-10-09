@@ -1,5 +1,17 @@
 ## SECTION=platform_project_specific
 
 menu "Pantavisor boards             "
+
+choice
+	prompt "board"
+	help
+	  The one board this platform builds an image for.
+	  'scripts/pv-build.sh <device>' selects it as well.
+
 source "generated/pv_boards.in"
+
+endchoice
+
+source "generated/pv_boards_options.in"
+
 endmenu

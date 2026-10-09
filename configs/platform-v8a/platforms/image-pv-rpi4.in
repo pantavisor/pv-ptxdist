@@ -1,7 +1,7 @@
 ## SECTION=pv_boards
 
 config IMAGE_PV_RPI4
-	tristate
+	bool
 	select HOST_GENIMAGE
 	select HOST_DOSFSTOOLS
 	select HOST_MTOOLS

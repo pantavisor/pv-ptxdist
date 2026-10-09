@@ -50,17 +50,19 @@ build machine needs are Docker and git.
 3. Build a device:
 
    ```sh
-   scripts/pv-build.sh orangepi5b       # or rpi4, qemu-arm64, qemu-x86_64
+   scripts/pv-build.sh orangepi5b       # or orangepi5, rpi3, rpi4, qemu-arm64, qemu-x86_64
    ```
 
    `scripts/pv-build.sh` selects the device's platform and toolchain in the
-   workspace and builds only that device's image, plus everything the image
-   needs. A first build takes a while and downloads the sources into
+   workspace, and its board in the platform's Pantavisor boards choice, and
+   builds only that device's image, plus everything the image needs. A first build takes a while and downloads the sources into
    `src/`. It ends by listing what it produced:
 
    | Device | Image | Also produced |
    |---|---|---|
+   | `orangepi5` | `platform-v8a/images/pv-orangepi5.img` | `pantavisor-bsp-orangepi5.pvrexport.tgz` |
    | `orangepi5b` | `platform-v8a/images/pv-orangepi5b.img` | `pantavisor-bsp-orangepi5b.pvrexport.tgz` |
+   | `rpi3` | `platform-v8a/images/pv-rpi3.img` | `pantavisor-bsp-rpi3.pvrexport.tgz` |
    | `rpi4` | `platform-v8a/images/pv-rpi4.img` | `pantavisor-bsp-rpi4.pvrexport.tgz` |
    | `qemu-arm64` | `platform-v8a/images/pv-hd.img` | `u-boot.bin`, `pantavisor-bsp.pvrexport.tgz` |
    | `qemu-x86_64` | `platform-x86_64/images/pv-hd.img` | `u-boot.rom`, `pantavisor-bsp.pvrexport.tgz` |
@@ -91,12 +93,15 @@ Kconfig menus work as well, since the script passes the terminal through:
 scripts/pv-docker.sh ptxdist menuconfig            # userland (ptxconfig)
 scripts/pv-docker.sh ptxdist menuconfig platform   # platform, images
 scripts/pv-docker.sh ptxdist menuconfig kernel
-scripts/pv-docker.sh ptxdist menuconfig u-boot-orangepi5b
-scripts/pv-docker.sh ptxdist menuconfig u-boot-rpi4
+scripts/pv-docker.sh ptxdist menuconfig u-boot-orangepi5b   # or -orangepi5, -rpi3, -rpi4
 ```
 
-Which boards a platform builds is the Pantavisor boards menu of
-`ptxdist menuconfig platform`; which containers go into revision 0 is
+A board's U-Boot is only part of the build while that board is selected,
+so select it first (`scripts/pv-build.sh <device>`) before configuring its
+U-Boot.
+
+Which board a platform builds is the Pantavisor boards choice of
+`ptxdist menuconfig platform` (`pv-build.sh` sets it too); which containers go into revision 0 is
 Pantavisor → containers in revision 0 in `ptxdist menuconfig` (see
 "Choosing boards and containers" in the README).
 

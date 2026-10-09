@@ -137,7 +137,7 @@ PTXCONF_KERNEL_IMAGE_RAW=y
 PTXCONF_KERNEL_IMAGE="Image"
 PTXCONF_KERNEL_DTB=y
 PTXCONF_KERNEL_DTS_PATH="${PTXDIST_PLATFORMCONFIG_SUBDIR}/dts:${KERNEL_DIR}/arch/${GENERIC_KERNEL_ARCH}/boot/dts"
-PTXCONF_KERNEL_DTS="armada-3720-community.dts freescale/imx8mm-evk.dts freescale/imx8mn-ddr4-evk.dts freescale/imx8mp-evk.dts freescale/imx8mq-evk.dts rockchip/rk3568-rock-3a.dts freescale/imx8mp-tqma8mpql-mba8mpxl.dts freescale/imx93-tqma9352-mba93xxca.dts ti/k3-am625-beagleplay.dts imx93-11x11-frdm.dts rockchip/rk3588s-orangepi-5b.dts broadcom/bcm2711-rpi-4-b.dts"
+PTXCONF_KERNEL_DTS="armada-3720-community.dts freescale/imx8mm-evk.dts freescale/imx8mn-ddr4-evk.dts freescale/imx8mp-evk.dts freescale/imx8mq-evk.dts rockchip/rk3568-rock-3a.dts freescale/imx8mp-tqma8mpql-mba8mpxl.dts freescale/imx93-tqma9352-mba93xxca.dts ti/k3-am625-beagleplay.dts imx93-11x11-frdm.dts rockchip/rk3588s-orangepi-5b.dts broadcom/bcm2711-rpi-4-b.dts broadcom/bcm2837-rpi-3-b-plus.dts rockchip/rk3588s-orangepi-5.dts"
 # PTXCONF_KERNEL_DTB_CHECK is not set
 # PTXCONF_KERNEL_DTBO is not set
 # PTXCONF_KERNEL_CODE_SIGNING is not set
@@ -206,7 +206,6 @@ PTXCONF_TF_A_ARTIFACTS="bl31/bl31.elf"
 PTXCONF_TF_A_BL32_NONE=y
 # PTXCONF_TF_A_BL32_TSP is not set
 PTXCONF_U_BOOT_ORANGEPI5B=y
-PTXCONF_U_BOOT_RPI4=y
 PTXCONF_U_BOOT_DEPENDENCIES=y
 PTXCONF_U_BOOT=y
 PTXCONF_U_BOOT_VERSION="2026.07"
@@ -283,17 +282,6 @@ PTXCONF_IMAGE_KERNEL_INSTALL_EARLY=y
 # end of Generate images/linuximage    
 
 # PTXCONF_IMAGE_NXP_IMX93_FRDM is not set
-PTXCONF_IMAGE_PV_BSP=y
-PTXCONF_IMAGE_PV_BSP_FDT=""
-PTXCONF_IMAGE_PV_BSP_DTBS=""
-PTXCONF_IMAGE_PV_BSP_FIRMWARE_PKGS=""
-PTXCONF_IMAGE_PV_BSP_SQUASHFS_OPTS="-comp xz"
-PTXCONF_IMAGE_PV_STORAGE=y
-PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER_UBOOT=y
-# PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER_GRUB is not set
-# PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER_RPIAB is not set
-PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER="uboot"
-PTXCONF_IMAGE_PV_STORAGE_SIZE="1G"
 # PTXCONF_IMAGE_RAUC is not set
 # PTXCONF_IMAGE_ROCK3A is not set
 PTXCONF_IMAGE_ROOT_CPIO=y
@@ -384,17 +372,26 @@ PTXCONF_HOST_ZSTD=y
 #
 # Pantavisor boards             
 #
+# PTXCONF_IMAGE_PV_HD is not set
+# PTXCONF_IMAGE_PV_ORANGEPI5 is not set
+PTXCONF_IMAGE_PV_ORANGEPI5B=y
+# PTXCONF_IMAGE_PV_RPI3 is not set
+# PTXCONF_IMAGE_PV_RPI4 is not set
 PTXCONF_IMAGE_PV_BOOT=y
 
 #
-# boot partition (all boards)
+# settings for all boards
 #
 PTXCONF_IMAGE_PV_BOOT_SIZE="64M"
 PTXCONF_IMAGE_PV_BOOT_EXTRA_FILES=""
 PTXCONF_IMAGE_PV_BOOT_OEMARGS=""
-PTXCONF_IMAGE_PV_HD=y
-PTXCONF_IMAGE_PV_ORANGEPI5B=y
-PTXCONF_IMAGE_PV_RPI4=y
+PTXCONF_IMAGE_PV_STORAGE_SIZE="1G"
+PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER_UBOOT=y
+# PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER_GRUB is not set
+# PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER_RPIAB is not set
+PTXCONF_IMAGE_PV_STORAGE_BOOTLOADER="uboot"
+PTXCONF_IMAGE_PV_BSP_FDT=""
+PTXCONF_IMAGE_PV_BSP_SQUASHFS_OPTS="-comp xz"
 # end of Pantavisor boards             
 
 #
