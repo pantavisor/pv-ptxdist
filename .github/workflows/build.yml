@@ -33,21 +33,23 @@ jobs:
       matrix:
         include:
           # One job per target: builds and artifact only that image plus the
-          # signed BSP for its platform ('ptxdist image <img>').
+          # signed BSP it was made from ('ptxdist image <img>' builds the
+          # BSP too). The boards have their own BSP with only their
+          # devicetree; QEMU uses the platform's generic one.
           - name: orangepi5b
             platform: v8a
             toolchain: aarch64-v8a-linux-gnu
             image_targets: pv-orangepi5b.img
             upload: |
               platform-v8a/images/pv-orangepi5b.img
-              platform-v8a/images/pantavisor-bsp.pvrexport.tgz
+              platform-v8a/images/pantavisor-bsp-orangepi5b.pvrexport.tgz
           - name: rpi4
             platform: v8a
             toolchain: aarch64-v8a-linux-gnu
             image_targets: pv-rpi4.img
             upload: |
               platform-v8a/images/pv-rpi4.img
-              platform-v8a/images/pantavisor-bsp.pvrexport.tgz
+              platform-v8a/images/pantavisor-bsp-rpi4.pvrexport.tgz
           - name: qemu_x86
             platform: x86_64
             toolchain: x86_64-unknown-linux-gnu
@@ -129,11 +131,11 @@ jobs:
           ptxdist platform configs/platform-${{ matrix.platform }}/platformconfig &&
           ptxdist toolchain ${TOOLCHAIN}"
 
-      # The per-target image ('ptxdist image <img>' builds all stages it
-      # depends on) plus the signed BSP export of the platform.
+      # 'ptxdist image <img>' builds all stages it depends on, the BSP
+      # included.
       - name: Build
         run: |
-          for t in ${{ matrix.image_targets }} pantavisor-bsp.pvrexport.tgz; do
+          for t in ${{ matrix.image_targets }}; do
             sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh sh -c "ptxdist -q -j\$(nproc) image ${t}"
           done
 

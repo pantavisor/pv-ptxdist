@@ -8,6 +8,7 @@ config IMAGE_PV_ORANGEPI5B
 	prompt "Generate images/pv-orangepi5b.img"
 	help
 	  Pantavisor SD card / eMMC image for the Orange Pi 5B: U-Boot
-	  at 32 KiB, then the boot and storage partitions of pv-hd.img.
-	  Needs rockchip/rk3588s-orangepi-5b.dtb in the BSP's device
-	  tree list.
+	  at 32 KiB, a boot partition with boot.scr and a storage
+	  partition. Its BSP (images/pantavisor-bsp-orangepi5b.pvrexport.tgz)
+	  carries only rockchip/rk3588s-orangepi-5b.dtb, which must be in
+	  the kernel's devicetree list.

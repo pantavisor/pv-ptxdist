@@ -11,5 +11,7 @@ config IMAGE_PV_RPI4
 	help
 	  Pantavisor SD card image for the Raspberry Pi 4: a vfat boot
 	  partition with the GPU firmware, config.txt, the devicetree,
-	  U-Boot and boot.scr, then pv-storage.ext4. Needs
-	  broadcom/bcm2711-rpi-4-b.dts in the kernel's devicetree list.
+	  U-Boot and boot.scr, then the storage partition. Its BSP
+	  (images/pantavisor-bsp-rpi4.pvrexport.tgz) carries only
+	  broadcom/bcm2711-rpi-4-b.dtb, which must be in the kernel's
+	  devicetree list.
