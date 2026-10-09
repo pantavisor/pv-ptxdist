@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: ${{ matrix.platform }}
-    runs-on: [self-hosted, Linux]
+    runs-on: [self-hosted, Linux, builder]
     timeout-minutes: 360
     permissions:
       contents: read
@@ -48,15 +48,19 @@ jobs:
           key: src-${{ hashFiles('rules/**', 'configs/**', 'base/rules/**', 'base/configs/**') }}
           restore-keys: src-
 
-      # PTXdist refuses to run as root, and the self-hosted runners drive the
-      # jobs as root. Do everything as a dedicated 'builder' user instead:
-      # hand it the workspace and the docker socket (created once on each
-      # runner, reused afterwards).
+      # PTXdist refuses to run as root, and self-hosted runners often drive
+      # the jobs as root. Do everything as a dedicated 'builder' user
+      # instead: hand it the workspace and the docker socket. Idempotent and
+      # flock-guarded; two runner instances on one host may run jobs of this
+      # workflow in parallel.
       - name: Prepare the non-root build user
         run: |
-          getent passwd builder >/dev/null || useradd -m -s /bin/bash builder
+          exec 9>/tmp/pv-ptxdist-builder.lock
+          flock 9
+          id -u builder >/dev/null 2>&1 || useradd -m -s /bin/bash builder || true
           getent group docker >/dev/null && usermod -aG docker builder || true
-          mkdir -p src
+          flock -u 9
+          id -u builder
           chown -R builder:builder .
 
       - name: Log in to ghcr.io
