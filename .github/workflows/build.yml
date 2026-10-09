@@ -42,32 +42,38 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull the build image
-        run: scripts/pv-docker.sh --pull
-
-      # Downloads only; the build itself always starts clean.
       - uses: actions/cache@v4
         with:
           path: src
           key: src-${{ hashFiles('rules/**', 'configs/**', 'base/rules/**', 'base/configs/**') }}
           restore-keys: src-
 
-      - name: Select the platform
+      # PTXdist refuses to run as root, and the self-hosted runners drive the
+      # jobs as root. Do everything as a dedicated 'builder' user instead:
+      # hand it the workspace and the docker socket (created once on each
+      # runner, reused afterwards).
+      - name: Prepare the non-root build user
         run: |
+          getent passwd builder >/dev/null || useradd -m -s /bin/bash builder
+          getent group docker >/dev/null && usermod -aG docker builder || true
           mkdir -p src
-          scripts/pv-docker.sh sh -c "
-            ptxdist select configs/ptxconfig &&
-            ptxdist platform configs/platform-${{ matrix.platform }}/platformconfig &&
-            ptxdist toolchain ${TOOLCHAIN}"
+          chown -R builder:builder .
+
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | sudo -E -H -u builder docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Pull the build image
+        run: sudo -E -H -u builder scripts/pv-docker.sh --pull
+
+      # Downloads only; the build itself always starts clean.
+      - name: Select the platform
+        run: sudo -E -H -u builder scripts/pv-docker.sh sh -c "
+          ptxdist select configs/ptxconfig &&
+          ptxdist platform configs/platform-${{ matrix.platform }}/platformconfig &&
+          ptxdist toolchain ${TOOLCHAIN}"
 
       - name: Build
-        run: scripts/pv-docker.sh sh -c 'ptxdist -q -j$(nproc) images'
+        run: sudo -E -H -u builder scripts/pv-docker.sh sh -c 'ptxdist -q -j$(nproc) images'
 
       - uses: actions/upload-artifact@v4
         with:
