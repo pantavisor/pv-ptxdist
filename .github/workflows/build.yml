@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.platform }}
+    name: ${{ matrix.name }}
     # The fleet label meta-pantavisor's buildkas-target.yaml workflow uses:
     # job only matches the dedicated builder machines, not the generic
     # org-level runners.
@@ -22,18 +22,27 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Orange Pi 5B, Raspberry Pi 4 and QEMU arm64 share the v8a platform.
-          - platform: v8a
+          # One job per target: builds and artifact only that image plus the
+          # signed BSP for its platform ('ptxdist image <img>').
+          - name: orangepi5b
+            platform: v8a
             toolchain: aarch64-v8a-linux-gnu
-            images: |
+            image_targets: pv-orangepi5b.img
+            upload: |
               platform-v8a/images/pv-orangepi5b.img
-              platform-v8a/images/pv-rpi4.img
-              platform-v8a/images/pv-hd.img
-              platform-v8a/images/u-boot.bin
               platform-v8a/images/pantavisor-bsp.pvrexport.tgz
-          - platform: x86_64
+          - name: rpi4
+            platform: v8a
+            toolchain: aarch64-v8a-linux-gnu
+            image_targets: pv-rpi4.img
+            upload: |
+              platform-v8a/images/pv-rpi4.img
+              platform-v8a/images/pantavisor-bsp.pvrexport.tgz
+          - name: qemu_x86
+            platform: x86_64
             toolchain: x86_64-unknown-linux-gnu
-            images: |
+            image_targets: pv-hd.img
+            upload: |
               platform-x86_64/images/pv-hd.img
               platform-x86_64/images/u-boot.rom
               platform-x86_64/images/pantavisor-bsp.pvrexport.tgz
@@ -110,13 +119,18 @@ jobs:
           ptxdist platform configs/platform-${{ matrix.platform }}/platformconfig &&
           ptxdist toolchain ${TOOLCHAIN}"
 
+      # The per-target image ('ptxdist image <img>' builds all stages it
+      # depends on) plus the signed BSP export of the platform.
       - name: Build
-        run: sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh sh -c 'ptxdist -q -j$(nproc) images'
+        run: |
+          for t in ${{ matrix.image_targets }} pantavisor-bsp.pvrexport.tgz; do
+            sudo -E -H -u "$BUILD_USER" scripts/pv-docker.sh sh -c "ptxdist -q -j\$(nproc) image ${t}"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pv-ptxdist-${{ matrix.platform }}
-          path: ${{ matrix.images }}
+          name: pv-ptxdist-${{ matrix.name }}
+          path: ${{ matrix.upload }}
           if-no-files-found: error
 
       - name: Keep the end of the build log
