@@ -93,7 +93,7 @@ Kconfig menus work as well, since the script passes the terminal through:
 scripts/pv-docker.sh ptxdist menuconfig            # userland (ptxconfig)
 scripts/pv-docker.sh ptxdist menuconfig platform   # platform, images
 scripts/pv-docker.sh ptxdist menuconfig kernel
-scripts/pv-docker.sh ptxdist menuconfig u-boot-orangepi5b   # or -orangepi5, -rpi3, -rpi4
+scripts/pv-docker.sh ptxdist menuconfig u-boot-orangepi5b   # or -orangepi5, -rpi3, -rpi4, -qemu-arm64
 ```
 
 A board's U-Boot is only part of the build while that board is selected,

@@ -14,8 +14,8 @@ PACKAGES-$(PTXCONF_U_BOOT_RPI3) += u-boot-rpi3
 #
 # Paths and names
 #
-U_BOOT_RPI3_VERSION	= $(call ptx/config-version, PTXCONF_U_BOOT)
-U_BOOT_RPI3_MD5		= $(call ptx/config-md5, PTXCONF_U_BOOT)
+U_BOOT_RPI3_VERSION	= $(call ptx/config-version, PTXCONF_U_BOOT_COMMON)
+U_BOOT_RPI3_MD5		= $(call ptx/config-md5, PTXCONF_U_BOOT_COMMON)
 U_BOOT_RPI3		= u-boot-rpi3-$(U_BOOT_RPI3_VERSION)
 U_BOOT_RPI3_SUFFIX	:= tar.bz2
 U_BOOT_RPI3_PATCHES	= u-boot-$(U_BOOT_RPI3_VERSION)
