@@ -124,9 +124,11 @@ jobs:
       - name: Build
         run: sudo -E -H -u "$BUILD_USER" scripts/pv-build.sh ${{ matrix.device }} -q
 
+      # Named by device: scripts/pv-release-assets.sh names the release
+      # assets after it.
       - uses: actions/upload-artifact@v4
         with:
-          name: pv-ptxdist-${{ matrix.name }}
+          name: pv-ptxdist-${{ matrix.device }}
           path: ${{ matrix.upload }}
           if-no-files-found: error
 
@@ -139,3 +141,44 @@ jobs:
         with:
           name: logfile-${{ matrix.platform }}
           path: logfile-tail.txt
+
+  # A tag gets a GitHub release with every device's image and BSP, once all
+  # builds have passed: no release with some devices missing.
+  release:
+    name: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # checkout leaves the tag as a lightweight ref without its annotation,
+      # which holds the release title and notes.
+      - name: Fetch the tag annotation
+        run: git fetch --force origin "+${GITHUB_REF}:${GITHUB_REF}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pv-ptxdist-*
+          path: artifacts
+
+      - name: Make the release assets
+        run: scripts/pv-release-assets.sh "${GITHUB_REF_NAME}" artifacts release
+
+      # Re-running the workflow for a tag updates its release.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="$(git tag -l --format='%(contents:subject)' "${GITHUB_REF_NAME}")"
+          assets=$(ls release/* | grep -v '/notes\.md$')
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" ${assets} --clobber
+            gh release edit "${GITHUB_REF_NAME}" --title "${title:-${GITHUB_REF_NAME}}" \
+              --notes-file release/notes.md
+          else
+            gh release create "${GITHUB_REF_NAME}" ${assets} \
+              --title "${title:-${GITHUB_REF_NAME}}" --notes-file release/notes.md --verify-tag
+          fi
