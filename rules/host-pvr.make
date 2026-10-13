@@ -23,8 +23,10 @@ HOST_PVR_SOURCE		:= $(SRCDIR)/$(HOST_PVR).$(HOST_PVR_SUFFIX)
 HOST_PVR_DIR		:= $(HOST_BUILDDIR)/$(HOST_PVR)
 # The release tarball contains just the binary, no top-level directory.
 HOST_PVR_STRIP_LEVEL	:= 0
-HOST_PVR_LICENSE	:= MIT
-HOST_PVR_LICENSE_FILES	:=
+# pvr is Apache-2.0 (LICENSE at tag 054); meta-pantavisor's pvr_054.bb says
+# MIT. The release tarball has only the binary, so no license file to
+# point at.
+HOST_PVR_LICENSE	:= Apache-2.0
 
 # ----------------------------------------------------------------------------
 # Prepare

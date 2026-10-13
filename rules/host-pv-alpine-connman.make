@@ -35,7 +35,10 @@ HOST_PV_ALPINE_CONNMAN_SUFFIX	:= pvrexport.tgz
 HOST_PV_ALPINE_CONNMAN_URL	:= https://pantavisor-ci.s3.amazonaws.com/meta-pantavisor/containers/$(HOST_PV_ALPINE_CONNMAN_VERSION)/pv-alpine-connman-docker-$(HOST_PV_ALPINE_CONNMAN_MACHINE)-scarthgap/pv-alpine-connman-$(HOST_PV_ALPINE_CONNMAN_MACHINE).$(HOST_PV_ALPINE_CONNMAN_SUFFIX)
 HOST_PV_ALPINE_CONNMAN_SOURCE	:= $(SRCDIR)/$(HOST_PV_ALPINE_CONNMAN).$(HOST_PV_ALPINE_CONNMAN_SUFFIX)
 HOST_PV_ALPINE_CONNMAN_DIR	:= $(HOST_BUILDDIR)/$(HOST_PV_ALPINE_CONNMAN)
-HOST_PV_ALPINE_CONNMAN_LICENSE	:= ignore
+# A built Alpine container: many packages, no license list shipped with it,
+# and none in its source repo (meta-pantavisor declares it CLOSED). It ends
+# up on the device, so keep it in the license report rather than ignore it.
+HOST_PV_ALPINE_CONNMAN_LICENSE	:= unknown
 
 # The pvrexport is deployed as is, not unpacked.
 $(STATEDIR)/host-pv-alpine-connman.extract:
