@@ -35,7 +35,10 @@ HOST_PV_PVR_SDK_SUFFIX	:= pvrexport.tgz
 HOST_PV_PVR_SDK_URL	:= https://pantavisor-ci.s3.amazonaws.com/meta-pantavisor/containers/$(HOST_PV_PVR_SDK_VERSION)/pv-pvr-sdk-docker-$(HOST_PV_PVR_SDK_MACHINE)-scarthgap/pv-pvr-sdk-$(HOST_PV_PVR_SDK_MACHINE).$(HOST_PV_PVR_SDK_SUFFIX)
 HOST_PV_PVR_SDK_SOURCE	:= $(SRCDIR)/$(HOST_PV_PVR_SDK).$(HOST_PV_PVR_SDK_SUFFIX)
 HOST_PV_PVR_SDK_DIR	:= $(HOST_BUILDDIR)/$(HOST_PV_PVR_SDK)
-HOST_PV_PVR_SDK_LICENSE	:= ignore
+# The pvr-sdk repo is MIT, but the container also carries Alpine packages
+# with no license list (meta-pantavisor declares it CLOSED). It ends up on
+# the device, so keep it in the license report rather than ignore it.
+HOST_PV_PVR_SDK_LICENSE	:= MIT AND unknown
 
 # The pvrexport is deployed as is, not unpacked.
 $(STATEDIR)/host-pv-pvr-sdk.extract:

@@ -22,7 +22,9 @@ HOST_PV_DEVELOPER_CA_SUFFIX	:= tar.gz
 HOST_PV_DEVELOPER_CA_URL	:= https://gitlab.com/api/v4/projects/pantacor%2Fpv-developer-ca/repository/archive.tar.gz?sha=$(HOST_PV_DEVELOPER_CA_VERSION)
 HOST_PV_DEVELOPER_CA_SOURCE	:= $(SRCDIR)/$(HOST_PV_DEVELOPER_CA).$(HOST_PV_DEVELOPER_CA_SUFFIX)
 HOST_PV_DEVELOPER_CA_DIR	:= $(HOST_BUILDDIR)/$(HOST_PV_DEVELOPER_CA)
-HOST_PV_DEVELOPER_CA_LICENSE	:= ignore
+# The pv-developer-ca repo has no license, and meta-pantavisor declares
+# none. Its keys end up on the device, so keep it in the license report.
+HOST_PV_DEVELOPER_CA_LICENSE	:= unknown
 
 # ----------------------------------------------------------------------------
 # Prepare
