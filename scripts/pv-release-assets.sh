@@ -45,13 +45,50 @@ link() {
 	echo "[$1](${base_url}/$1)"
 }
 
+# The same machine and devices as scripts/run-qemu-pv.sh, which needs a
+# build tree; these work with the downloaded files alone.
+#   $1: device, $2: image, $3: U-Boot firmware
+qemu_howto() {
+	local qemu dev
+	case "$1" in
+	qemu-x86_64)
+		# U-Boot's qemu-x86_64 build supports i440fx, not q35.
+		qemu="qemu-system-x86_64 -M pc"
+		dev=pci
+		;;
+	qemu-arm64)
+		qemu="qemu-system-aarch64 -M virt -cpu cortex-a57"
+		dev=device
+		;;
+	*)
+		return 0
+		;;
+	esac
+	cat <<-EOF
+
+	### $(describe "$1")
+
+	\`\`\`sh
+	xz -dc $2.xz > $2
+	truncate -s 4G $2    # room for the storage partition to grow
+	${qemu} -smp 2 -m 1024 -nographic \\
+	    -bios $3 \\
+	    -drive if=none,file=$2,format=raw,id=hd0 \\
+	    -device virtio-blk-${dev},drive=hd0 \\
+	    -netdev user,id=net0,hostfwd=tcp:127.0.0.1:8222-:8222 \\
+	    -device virtio-net-${dev},netdev=net0
+	\`\`\`
+	EOF
+}
+
 mkdir -p "${out}"
 rows=
+qemu=
 
 for dir in "${artifacts}"/pv-ptxdist-*/; do
 	device="$(basename "${dir}")"
 	device="${device#pv-ptxdist-}"
-	image= bsp= other=
+	image= bsp= other= image_name= firmware=
 	for f in "${dir}"*; do
 		name="$(basename "${f}")"
 		# The QEMU files have generic names (pv-hd.img, u-boot.rom,
@@ -65,6 +102,7 @@ for dir in "${artifacts}"/pv-ptxdist-*/; do
 		*.img)
 			xz -T0 -c "${f}" > "${out}/${name}.xz"
 			image="$(link "${name}.xz")"
+			image_name="${name}"
 			;;
 		*.pvrexport.tgz)
 			cp "${f}" "${out}/${name}"
@@ -73,10 +111,12 @@ for dir in "${artifacts}"/pv-ptxdist-*/; do
 		*)
 			cp "${f}" "${out}/${name}"
 			other="${other:+${other}, }$(link "${name}")"
+			case "${name}" in u-boot*) firmware="${name}" ;; esac
 			;;
 		esac
 	done
 	rows="${rows}| $(describe "${device}") | ${image} | ${bsp} | ${other} |"$'\n'
+	qemu="${qemu}$(qemu_howto "${device}" "${image_name}" "${firmware}")"
 done
 
 (cd "${out}" && sha256sum -- * > SHA256SUMS)
@@ -100,5 +140,21 @@ done
 
 	The BSP (\`.pvrexport.tgz\`) is the signed kernel, initramfs, modules and
 	firmware the image was built from, for updating a device with \`pvr\`.
+	EOF
+	[ -z "${qemu}" ] || cat <<-EOF
+
+	## Run in QEMU
+
+	U-Boot boots the image the same way as on hardware. The image file is the
+	device's disk and keeps its state between runs; decompress it again for
+	a fresh device.
+	${qemu}
+
+	- Press Enter at \`Press [ENTER] for debug ash shell...\` for a debug
+	  shell. Ctrl-A X quits QEMU.
+	- The device's SSH port 8222 is forwarded to 127.0.0.1:8222.
+	- U-Boot tries a FIT image and several boot commands before the one
+	  that works, so \`Failed to load fit\` and an \`ERROR\` or two before
+	  \`Starting kernel ...\` are expected.
 	EOF
 } > "${out}/notes.md"
