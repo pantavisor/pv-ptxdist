@@ -20,7 +20,7 @@ upstream DistroKit directly.
 | `configs/ptxconfig{,.diff}` | Pantavisor initramfs userland, as a delta to DistroKit's |
 | `configs/platform-v8a/*.diff` | v8a kernel delta: U-Boot instead of barebox, Pantavisor images, kernel fragments |
 | `configs/platform-x86_64/*.diff` | x86_64 platform and kernel deltas, created for the QEMU target |
-| `configs/platform-v8a/u-boot*.config` | U-Boot for QEMU arm64, the Orange Pi 5B and the Raspberry Pi 4 |
+| `configs/platform-v8a/u-boot-*.config` | U-Boot per v8a board (QEMU arm64, Orange Pi 5/5B, Raspberry Pi 3B+/4); the version is in common U-Boot options |
 | `configs/platform-x86_64/u-boot.config` | U-Boot qemu-x86_64, the QEMU firmware |
 | `configs/kernel-fragments/` | Kernel fragments, merged into the kernel delta with `scripts/merge-pv-kernel-fragments.sh` |
 | `configs/pantavisor/` | Device skel, `pantahub.config`, boot script sources |

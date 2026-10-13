@@ -2,7 +2,7 @@
 
 config U_BOOT_ORANGEPI5
 	tristate
-	select U_BOOT			if BUILDTIME
+	select U_BOOT_COMMON
 	select TF_A
 	select RKBIN_RK3588
 	select HOST_SYSTEM_PYTHON3
@@ -14,7 +14,7 @@ config U_BOOT_ORANGEPI5
 	  Selected by its board in Pantavisor boards.
 
 	  Mainline U-Boot for the Orange Pi 5 (RK3588S), built from the
-	  U-Boot version selected for the platform with TF-A BL31 and the
+	  U-Boot version in common U-Boot options with TF-A BL31 and the
 	  rkbin DDR blob. Produces images/u-boot-rockchip-orangepi5.bin,
 	  to be written at 32 KiB.
 

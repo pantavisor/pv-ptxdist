@@ -1,0 +1,16 @@
+## SECTION=bootloader
+
+# IMAGE_PV_HD is shared with x86_64, which uses PTXdist's U_BOOT, so it
+# cannot select this symbol; follow it instead.
+config U_BOOT_QEMU_ARM64
+	tristate
+	default IMAGE_PV_HD
+	select U_BOOT_COMMON
+	# mkimage includes <openssl/evp.h> (CONFIG_TOOLS_LIBCRYPTO)
+	select HOST_OPENSSL
+	help
+	  Enabled with the QEMU board in Pantavisor boards.
+
+	  Mainline U-Boot for QEMU arm64 (qemu_arm64_defconfig), built
+	  from the U-Boot version in common U-Boot options. QEMU loads
+	  it through -bios: images/u-boot.bin.

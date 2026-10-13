@@ -1,0 +1,24 @@
+## SECTION=bootloader
+
+# Like DistroKit's barebox-common, but without a package behind it: a
+# select of this symbol adds no build dependency. Selecting PTXdist's own
+# U_BOOT for its version instead would build the QEMU U-Boot for every
+# board.
+menuconfig U_BOOT_COMMON
+	prompt "common U-Boot options         "
+	bool
+	help
+	  The U-Boot version all v8a board U-Boots are built from.
+
+if U_BOOT_COMMON
+
+config U_BOOT_COMMON_VERSION
+	prompt "U-Boot version"
+	string
+	default "2026.07"
+
+config U_BOOT_COMMON_MD5
+	prompt "U-Boot source md5sum"
+	string
+
+endif
