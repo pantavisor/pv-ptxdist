@@ -100,15 +100,21 @@ with the Orange Pi 5B), or revert them.
 
 ### The build container
 
-`ghcr.io/pantavisor/pv-ptxdist-builder` has PTXdist, the OSELAS toolchains
-and all host dependencies; `docker/Dockerfile` builds it and CI publishes it
-on changes to `docker/`. `scripts/pv-docker.sh` runs anything else in it:
+[`ferlzc/pv-ptxdist-builder`](https://hub.docker.com/r/ferlzc/pv-ptxdist-builder)
+on Docker Hub has PTXdist, the OSELAS toolchains and all host dependencies.
+It is public, so no login is needed. `docker/Dockerfile` builds it. CI
+publishes the same image to `ghcr.io/pantavisor/pv-ptxdist-builder` on
+changes to `docker/` and builds with that one. `scripts/pv-docker.sh` uses
+the Docker Hub image by default and runs anything else in it:
 
 ```sh
-scripts/pv-docker.sh --build               # build the container locally instead of pulling
+scripts/pv-docker.sh --pull                # download the container
+scripts/pv-docker.sh --build               # or build it locally instead of pulling
 scripts/pv-docker.sh ptxdist menuconfig    # any PTXdist command
 scripts/pv-docker.sh                       # a shell
 ```
+
+`PV_DOCKER_IMAGE` selects another image, e.g. the ghcr.io one.
 
 The workspace is mounted at its host path and commands run with your
 uid/gid. The full workflow (daily work, menuconfig, testing, options) is in
