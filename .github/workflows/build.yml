@@ -54,6 +54,10 @@ jobs:
               platform-x86_64/images/pv-hd.img
               platform-x86_64/images/u-boot.rom
               platform-x86_64/images/pantavisor-bsp.pvrexport.tgz
+    # The image builder-image.yml publishes, not the Docker Hub copy that
+    # scripts/pv-docker.sh defaults to and that can lag behind docker/.
+    env:
+      PV_DOCKER_IMAGE: ghcr.io/${{ github.repository_owner }}/pv-ptxdist-builder:ptxdist-2026.10.0
     steps:
       # A platform build tree is ~10 GB on top of the 5.7 GB build image.
       - uses: actions/checkout@v4
