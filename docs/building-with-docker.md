@@ -7,9 +7,11 @@ build machine needs are Docker and git.
 
 ## How it works
 
-- The image is `ghcr.io/pantavisor/pv-ptxdist-builder:ptxdist-2026.10.0`,
-  built from `docker/Dockerfile`. CI publishes it when `docker/` changes on
-  `main`.
+- The image is
+  [`ferlzc/pv-ptxdist-builder:ptxdist-2026.10.0`](https://hub.docker.com/r/ferlzc/pv-ptxdist-builder)
+  on Docker Hub, public, built from `docker/Dockerfile`. CI publishes the
+  same image to `ghcr.io/pantavisor/pv-ptxdist-builder` when `docker/`
+  changes on `main` and builds with that one.
 - The workspace is mounted at the same path as on the host, because PTXdist
   stores absolute paths in the build tree.
 - Commands run with your uid and gid, so everything the build writes belongs
@@ -28,17 +30,10 @@ build machine needs are Docker and git.
 
    In an existing clone without `base/`: `git submodule update --init`.
 
-2. Get the image. Pull it from the registry:
+2. Get the image. Pull it from Docker Hub, no login needed:
 
    ```sh
    scripts/pv-docker.sh --pull
-   ```
-
-   While the package is private, log in first with a GitHub token that has
-   `read:packages`:
-
-   ```sh
-   echo <token> | docker login ghcr.io -u <github-user> --password-stdin
    ```
 
    Or build it locally instead (about 10 minutes, 5.7 GB):
@@ -163,7 +158,7 @@ requirements are listed in the README's CI section.
 
 | Variable | Default | Use |
 |---|---|---|
-| `PV_DOCKER_IMAGE` | `ghcr.io/pantavisor/pv-ptxdist-builder:ptxdist-2026.10.0` | Another image or tag, e.g. a locally built test image |
+| `PV_DOCKER_IMAGE` | `ferlzc/pv-ptxdist-builder:ptxdist-2026.10.0` | Another image or tag, e.g. a locally built test image or the ghcr.io one |
 | `PV_DOCKER_ARGS` | | Extra `docker run` arguments, word-split |
 
 For example, to share a source download directory between several clones,

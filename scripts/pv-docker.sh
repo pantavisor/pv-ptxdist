@@ -19,7 +19,9 @@
 set -e
 
 bsp="$(cd "$(dirname "$0")/.." && pwd)"
-image="${PV_DOCKER_IMAGE:-ghcr.io/pantavisor/pv-ptxdist-builder:ptxdist-2026.10.0}"
+# Docker Hub, because the ghcr.io package is not public. CI publishes new
+# images to ghcr.io only: push a copy here when docker/ changes.
+image="${PV_DOCKER_IMAGE:-ferlzc/pv-ptxdist-builder:ptxdist-2026.10.0}"
 
 case "$1" in
 --build)
