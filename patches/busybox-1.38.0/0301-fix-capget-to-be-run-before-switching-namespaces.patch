@@ -4,6 +4,7 @@ Date: Mon, 1 Nov 2021 13:01:10 +0100
 Subject: [PATCH 301/310] fix capget to be run before switching namespaces
 
 (cherry picked from commit c18302ac03f3476cab3df94b3d4467fff63db025)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  util-linux/nsenter.c | 18 +++++++++++++-----
  1 file changed, 13 insertions(+), 5 deletions(-)

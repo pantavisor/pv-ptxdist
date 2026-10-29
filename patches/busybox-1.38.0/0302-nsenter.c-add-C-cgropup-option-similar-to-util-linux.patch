@@ -5,6 +5,7 @@ Subject: [PATCH 302/310] nsenter.c: add -C/--cgropup option similar to
  util-linux
 
 (cherry picked from commit c5b27f41a127eae8eecbcefda3d2cdbf9ad4ef91)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  util-linux/nsenter.c | 39 ++++++++++++++++++++++++---------------
  1 file changed, 24 insertions(+), 15 deletions(-)

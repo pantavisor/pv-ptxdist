@@ -5,6 +5,7 @@ Subject: [PATCH 307/310] fix create_and_bind_to_netlink setting sa.nl_pid to
  potentially not system unique value
 
 (cherry picked from commit 5b34ff9e9804b11f851c2c0e6782e015de6e790f)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  libbb/xconnect.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

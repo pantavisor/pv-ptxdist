@@ -12,6 +12,7 @@ Subject: [PATCH 308/310] Improve mdev MODALIAS; support loading pci bus
  * introduce OP_modalias to make_device function
 
 (cherry picked from commit 758b22439ecddb345253198433778972f86b9a25)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  include/libbb.h          |  7 ++--
  libbb/recursive_action.c |  4 +-

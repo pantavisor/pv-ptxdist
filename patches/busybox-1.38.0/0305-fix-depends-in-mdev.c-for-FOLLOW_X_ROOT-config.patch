@@ -4,6 +4,7 @@ Date: Wed, 11 May 2022 21:15:45 +0200
 Subject: [PATCH 305/310] fix depends in mdev.c for FOLLOW_X_ROOT config
 
 (cherry picked from commit fb3b7e1353d126be78cd6f4c329a3018db5161d0)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  util-linux/mdev.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

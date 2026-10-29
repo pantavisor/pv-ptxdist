@@ -4,6 +4,7 @@ Date: Wed, 12 Apr 2023 16:19:15 +0200
 Subject: [PATCH 310/310] unshare: add -C|--cgroup option similar to util-linux
 
 (cherry picked from commit 8143ead4fc16cdaccd0b5a38b13a4883b3809b7b)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  util-linux/unshare.c | 20 +++++++++++++-------
  1 file changed, 13 insertions(+), 7 deletions(-)

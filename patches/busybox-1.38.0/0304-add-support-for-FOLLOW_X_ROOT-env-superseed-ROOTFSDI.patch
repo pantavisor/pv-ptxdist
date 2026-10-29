@@ -5,6 +5,7 @@ Subject: [PATCH 304/310] add support for FOLLOW_X_ROOT env; superseed
  ROOTFSDIR in turn
 
 (cherry picked from commit f12cd7033f7f563e342a038f5e451be5976ced42)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  util-linux/mdev.c | 73 +++++++++++++++++++++++++++++++++++++----------
  1 file changed, 58 insertions(+), 15 deletions(-)

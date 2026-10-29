@@ -4,6 +4,7 @@ Date: Mon, 23 May 2022 23:49:29 +0200
 Subject: [PATCH 306/310] add FOLLOW_X_PID support for pantavisor mdev
 
 (cherry picked from commit 838b5e51f408d1c68ce52734de6b5f09e5e3da13)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  util-linux/mdev.c | 39 +++++++++++++++++++++++++++++++--------
  1 file changed, 31 insertions(+), 8 deletions(-)

@@ -5,6 +5,7 @@ Subject: [PATCH 300/310] add --caps flag to make nsenter also adopt the same
  caps that the target process holds
 
 (cherry picked from commit 0166864efe7903b57cec70744ea3f0dd551b7208)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  include/libbb.h      |  2 +-
  util-linux/nsenter.c | 72 ++++++++++++++++++++++++++++++++++++++++++--

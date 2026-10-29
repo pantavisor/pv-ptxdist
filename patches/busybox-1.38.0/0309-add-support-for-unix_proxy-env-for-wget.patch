@@ -8,6 +8,7 @@ Example: unix_proxy=local:/run/socketX wget http://localhost/test.cgi
 This will make HTTP call to local unix socket /run/socketX
 
 (cherry picked from commit bda882eee7f2376a40a662693d121433aa9ce6df)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  networking/wget.c | 9 ++++++++-
  1 file changed, 8 insertions(+), 1 deletion(-)
