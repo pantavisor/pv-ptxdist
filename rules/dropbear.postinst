@@ -1,0 +1,4 @@
+#!/bin/sh
+if [ -f $DESTDIR/etc/rc.once.d/dropbear ]; then
+	$DESTDIR/usr/sbin/enable-rc-once dropbear
+fi
