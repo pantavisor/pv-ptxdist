@@ -6,7 +6,7 @@ menuconfig PANTAVISOR
 	select HOST_CMAKE
 	select LIBTHTTP
 	select PICOHTTPPARSER
-	select MBEDTLS_PV
+	select MBEDTLS
 	select LXC_PV
 	select ZLIB
 	select LIBEVENT_PV
