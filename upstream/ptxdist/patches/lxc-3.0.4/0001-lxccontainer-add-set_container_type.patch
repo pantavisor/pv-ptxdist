@@ -1,0 +1,125 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ricardo Mendoza <ricmm@pantacor.com>
+Date: Thu, 29 Oct 2026 19:12:55 -0300
+Subject: [PATCH 01/15] lxccontainer: add set_container_type()
+
+Let API users override the "lxc" in the container=lxc environment
+variable that liblxc sets for the container's init, so it can tell
+which kind of container it runs in.
+
+[fernando: split out of "Support for pantavisor build", without the
+ static archive and set_inherit_namespaces() parts; free the previous
+ type instead of the argument, and use setenv() instead of a fixed-size
+ sprintf() buffer handed to putenv()]
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/conf.c         |  1 +
+ src/lxc/conf.h         |  2 ++
+ src/lxc/lxccontainer.c | 20 ++++++++++++++++++++
+ src/lxc/lxccontainer.h | 11 +++++++++++
+ src/lxc/start.c        |  5 +++--
+ 5 files changed, 37 insertions(+), 2 deletions(-)
+
+diff --git a/src/lxc/conf.c b/src/lxc/conf.c
+index f62333e..62439e8 100644
+--- a/src/lxc/conf.c
++++ b/src/lxc/conf.c
+@@ -4057,6 +4057,7 @@ void lxc_conf_free(struct lxc_conf *conf)
+ 	lxc_clear_namespace(conf);
+ 	free(conf->cgroup_meta.dir);
+ 	free(conf->cgroup_meta.controllers);
++	free(conf->type);
+ 	free(conf);
+ }
+ 
+diff --git a/src/lxc/conf.h b/src/lxc/conf.h
+index 41f67cf..5892f5d 100644
+--- a/src/lxc/conf.h
++++ b/src/lxc/conf.h
+@@ -376,6 +376,8 @@ struct lxc_conf {
+ 
+ 	/* procs */
+ 	struct lxc_list procs;
++
++	char *type;
+ };
+ 
+ extern int write_id_mapping(enum idtype idtype, pid_t pid, const char *buf,
+diff --git a/src/lxc/lxccontainer.c b/src/lxc/lxccontainer.c
+index d6b88a5..1db73e3 100644
+--- a/src/lxc/lxccontainer.c
++++ b/src/lxc/lxccontainer.c
+@@ -4938,6 +4938,25 @@ static bool do_lxcapi_restore(struct lxc_container *c, char *directory, bool ver
+ 
+ WRAP_API_2(bool, lxcapi_restore, char *, bool)
+ 
++static bool do_lxcapi_set_container_type(struct lxc_container *c, char *type)
++{
++	char *dup;
++
++	if (!c || !c->lxc_conf || !type)
++		return false;
++
++	dup = strdup(type);
++	if (!dup)
++		return false;
++
++	free(c->lxc_conf->type);
++	c->lxc_conf->type = dup;
++
++	return true;
++}
++
++WRAP_API_1(bool, lxcapi_set_container_type, char *)
++
+ static int lxcapi_attach_run_waitl(struct lxc_container *c, lxc_attach_options_t *options, const char *program, const char *arg, ...)
+ {
+ 	va_list ap;
+@@ -5105,6 +5124,7 @@ struct lxc_container *lxc_container_new(const char *name, const char *configpath
+ 	c->restore = lxcapi_restore;
+ 	c->migrate = lxcapi_migrate;
+ 	c->console_log = lxcapi_console_log;
++	c->set_container_type = lxcapi_set_container_type;
+ 
+ 	return c;
+ 
+diff --git a/src/lxc/lxccontainer.h b/src/lxc/lxccontainer.h
+index 9e06215..0b82129 100644
+--- a/src/lxc/lxccontainer.h
++++ b/src/lxc/lxccontainer.h
+@@ -847,6 +847,17 @@ struct lxc_container {
+ 	 * \return \c true if the container was rebooted successfully, else \c false.
+ 	 */
+ 	bool (*reboot2)(struct lxc_container *c, int timeout);
++
++	/*!
++	 * \brief Override the 'lxc' container type in the environment of
++	 *  the container's init (\c container=<type>).
++	 *
++	 * \param c Container.
++	 * \param type Container type.
++	 *
++	 * \return \c true on success, else \c false.
++	 */
++	bool (*set_container_type)(struct lxc_container *c, char *type);
+ };
+ 
+ /*!
+diff --git a/src/lxc/start.c b/src/lxc/start.c
+index 720b3bc..af8a810 100644
+--- a/src/lxc/start.c
++++ b/src/lxc/start.c
+@@ -1405,9 +1405,10 @@ static int do_start(void *data)
+ 		}
+ 	}
+ 
+-	ret = putenv("container=lxc");
++	ret = setenv("container", handler->conf->type ? handler->conf->type : "lxc", 1);
+ 	if (ret < 0) {
+-		SYSERROR("Failed to set environment variable: container=lxc");
++		SYSERROR("Failed to set environment variable: container=%s",
++			 handler->conf->type ? handler->conf->type : "lxc");
+ 		goto out_warn_father;
+ 	}
+ 

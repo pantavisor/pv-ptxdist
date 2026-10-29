@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: "Pranay Kr. Srivastava" <pranay.srivastava@pantacor.com>
+Date: Mon, 24 Aug 2020 13:40:02 +0530
+Subject: [PATCH 04/15] Check only rootfs as filesystem type
+
+When detecting if rootfs is on ramfs instead of checking "- rootfs
+rootfs" which is the " - <file_system> <device>" information only check
+the file system type. This is due to a change introduced in kernel where
+ramfs file system doesn't set the device to "rootfs" but instead mark it
+as "none". By making sure we only check for "rootfs" as the file system
+name we also offer backward compatibility with earlier kernels as well.
+
+The kernel commit that introduced this change was
+
+commit f32356261d44d580649a7abce1156d15d49cf20f
+Author: David Howells <dhowells@redhat.com>
+Date:   Mon Mar 25 16:38:31 2019 +0000
+
+    vfs: Convert ramfs, shmem, tmpfs, devtmpfs, rootfs to use the new
+    mount API
+
+Signed-off-by: Pranay Kr. Srivastava <pranay.srivastava@pantacor.com>
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/utils.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/lxc/utils.c b/src/lxc/utils.c
+index 21c1ae8..f3ce2b2 100644
+--- a/src/lxc/utils.c
++++ b/src/lxc/utils.c
+@@ -760,7 +760,7 @@ bool detect_ramfs_rootfs(void)
+ 		if (strcmp(p + 1, "/") == 0) {
+ 			/* This is '/'. Is it the ramfs? */
+ 			p = strchr(p2 + 1, '-');
+-			if (p && strncmp(p, "- rootfs rootfs ", 16) == 0) {
++			if (p && strncmp(p, "- rootfs ", 9) == 0) {
+ 				free(line);
+ 				fclose(f);
+ 				INFO("Rootfs is located on ramfs");

@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Thu, 29 Oct 2026 19:14:16 -0300
+Subject: [PATCH 10/15] add support for origin=mkdir mount option
+
+ * try to create the source directory before mounting if it does not exist
+
+[fernando: ported to 3.0.4, where it comes before the realpath_x()
+ changes it was written on top of; build the path with a bounded
+ snprintf() and fall back to the source as given when a relative mount
+ has no rootfs, which also covers "Fixes problem with sprintf and NULL
+ value in conf.c" by Felipe Ortiz]
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/conf.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/src/lxc/conf.c b/src/lxc/conf.c
+index 6383f70..8b81cce 100644
+--- a/src/lxc/conf.c
++++ b/src/lxc/conf.c
+@@ -2085,6 +2085,8 @@ static void cull_mntent_opt(struct mntent *mntent)
+ 	char *list[] = {
+ 		"create=dir",
+ 		"create=file",
++		"origin=mkdir",
++		"origin=mkfile",
+ 		"optional",
+ 		"relative",
+ 		NULL
+@@ -2179,6 +2181,30 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
+ 	if (rootfs && rootfs->path)
+ 		rootfs_path = rootfs->mount;
+ 
++	if (hasmntopt(mntent, "origin=mkdir")) {
++		char mkpath[PATH_MAX];
++
++		if (relative && rootfs_path)
++			ret = snprintf(mkpath, sizeof(mkpath), "%s/%s",
++				       rootfs_path, mntent->mnt_fsname);
++		else
++			ret = snprintf(mkpath, sizeof(mkpath), "%s",
++				       mntent->mnt_fsname);
++		if (ret < 0 || (size_t)ret >= sizeof(mkpath))
++			return -1;
++
++		ret = mkdir_p(mkpath, 0755);
++		if (ret < 0 && errno != EEXIST) {
++			SYSERROR("Failed to create origin=mkdir requested directory \"%s\"", mkpath);
++			return -1;
++		}
++		if (!ret)
++			INFO("mount source directory created through origin=mkdir mountopt %s -> %s", mkpath, mntent->mnt_dir);
++	} else if (hasmntopt(mntent, "origin=mkfile")) {
++		SYSERROR("mount option origin=mkfile NOTIMPLEMENTED. Contributions welcome!");
++		return -1;
++	}
++
+ 	ret = mount_entry_create_dir_file(mntent, path, rootfs, lxc_name,
+ 					  lxc_path);
+ 	if (ret < 0) {

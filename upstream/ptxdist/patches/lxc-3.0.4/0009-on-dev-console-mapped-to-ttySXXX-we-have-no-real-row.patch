@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Thu, 3 Nov 2022 12:16:46 +0100
+Subject: [PATCH 09/15] on /dev/console mapped to ttySXXX we have no real row
+ count; lets ensure we use 25 as default in that case
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/tools/lxc_top.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/lxc/tools/lxc_top.c b/src/lxc/tools/lxc_top.c
+index 41ff101..4423884 100644
+--- a/src/lxc/tools/lxc_top.c
++++ b/src/lxc/tools/lxc_top.c
+@@ -183,7 +183,7 @@ static int stdin_tios_rows(void)
+ {
+ 	struct winsize wsz;
+ 
+-	if (isatty(0) && ioctl(0, TIOCGWINSZ, &wsz) == 0)
++	if (isatty(0) && ioctl(0, TIOCGWINSZ, &wsz) == 0 && wsz.ws_row > 10)
+ 		return wsz.ws_row;
+ 
+ 	return 25;

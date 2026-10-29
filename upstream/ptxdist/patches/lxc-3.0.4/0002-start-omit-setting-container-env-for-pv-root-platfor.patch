@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Thu, 29 Oct 2026 19:13:05 -0300
+Subject: [PATCH 02/15] start: omit setting container env for pv-root platform
+
+[fernando: rebased onto the setenv() version of set_container_type()]
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/start.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/src/lxc/start.c b/src/lxc/start.c
+index af8a810..8f804df 100644
+--- a/src/lxc/start.c
++++ b/src/lxc/start.c
+@@ -1405,11 +1405,14 @@ static int do_start(void *data)
+ 		}
+ 	}
+ 
+-	ret = setenv("container", handler->conf->type ? handler->conf->type : "lxc", 1);
+-	if (ret < 0) {
+-		SYSERROR("Failed to set environment variable: container=%s",
+-			 handler->conf->type ? handler->conf->type : "lxc");
+-		goto out_warn_father;
++	/* the pv-root platform is the host itself, not a container */
++	if (!handler->conf->type || strcmp(handler->conf->type, "pv-root")) {
++		ret = setenv("container", handler->conf->type ? handler->conf->type : "lxc", 1);
++		if (ret < 0) {
++			SYSERROR("Failed to set environment variable: container=%s",
++				 handler->conf->type ? handler->conf->type : "lxc");
++			goto out_warn_father;
++		}
+ 	}
+ 
+ 	if (handler->conf->ttys.tty_names) {

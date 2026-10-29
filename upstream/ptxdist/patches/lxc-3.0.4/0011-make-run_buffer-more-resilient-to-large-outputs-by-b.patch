@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Tue, 28 Mar 2023 10:00:48 +0200
+Subject: [PATCH 11/15] make run_buffer more resilient to large outputs by
+ bumping buffers
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/conf.c | 2 +-
+ src/lxc/log.h  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/lxc/conf.c b/src/lxc/conf.c
+index 8b81cce..6f736f7 100644
+--- a/src/lxc/conf.c
++++ b/src/lxc/conf.c
+@@ -331,7 +331,7 @@ static int run_buffer(char *buffer)
+ 		return -1;
+ 	}
+ 
+-	for (int i = 0; i < 10; i++) {
++	for (int i = 0; i < 1000; i++) {
+ 		ssize_t bytes_read;
+ 
+ 		bytes_read = lxc_read_nointr(fd, output, LXC_LOG_BUFFER_SIZE - 1);
+diff --git a/src/lxc/log.h b/src/lxc/log.h
+index b026b0b..184e8b5 100644
+--- a/src/lxc/log.h
++++ b/src/lxc/log.h
+@@ -45,7 +45,7 @@
+ #endif
+ 
+ #define LXC_LOG_PREFIX_SIZE	32
+-#define LXC_LOG_BUFFER_SIZE	4096
++#define LXC_LOG_BUFFER_SIZE	32768
+ 
+ /* This attribute is required to silence clang warnings */
+ #if defined(__GNUC__)
