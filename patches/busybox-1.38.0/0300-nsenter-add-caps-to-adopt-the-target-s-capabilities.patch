@@ -1,15 +1,21 @@
-From 4a17d70fc8a52ff3a885a09db5079939db8a1d3d Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alexander Sack <asac@pantacor.com>
-Date: Sun, 31 Oct 2021 23:57:40 +0100
-Subject: [PATCH 300/310] add --caps flag to make nsenter also adopt the same
- caps that the target process holds
+Date: Mon, 1 Nov 2021 13:01:10 +0100
+Subject: [PATCH] nsenter: add --caps to adopt the target's capabilities
 
+With --target, read the target process' capabilities before switching
+namespaces and drop from the bounding set whatever it does not hold.
+
+[fernando: squashed "add --caps flag to make nsenter also adopt the same
+ caps that the target process holds" and "fix capget to be run before
+ switching namespaces"]
 (cherry picked from commit 0166864efe7903b57cec70744ea3f0dd551b7208)
+(cherry picked from commit c18302ac03f3476cab3df94b3d4467fff63db025)
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  include/libbb.h      |  2 +-
- util-linux/nsenter.c | 72 ++++++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 71 insertions(+), 3 deletions(-)
+ util-linux/nsenter.c | 80 ++++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 79 insertions(+), 3 deletions(-)
 
 diff --git a/include/libbb.h b/include/libbb.h
 index 37f9da5..82aa043 100644
@@ -25,7 +31,7 @@ index 37f9da5..82aa043 100644
  void printf_cap(const char *pfx, unsigned cap_no) FAST_FUNC;
  void drop_capability(int cap_ordinal) FAST_FUNC;
 diff --git a/util-linux/nsenter.c b/util-linux/nsenter.c
-index 425d517..669fe29 100644
+index 425d517..c857fc5 100644
 --- a/util-linux/nsenter.c
 +++ b/util-linux/nsenter.c
 @@ -54,6 +54,22 @@
@@ -89,12 +95,12 @@ index 425d517..669fe29 100644
  
  	memset(ns_ctx_list, 0, sizeof(ns_ctx_list));
  
-@@ -262,6 +284,52 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
- 		/* Child continues */
+@@ -196,6 +218,19 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
+ 					target_pid, ns->ns_nsfile8);
  	}
  
 +	/*
-+	 * Entering the namespace with caps matching the target
++	 * Lets gather caps info from target pid before switching NS if --caps is used
 +	 */
 +	if ((opts & OPT_cap) && (opts & OPT_target)) {
 +		int ret;
@@ -103,6 +109,21 @@ index 425d517..669fe29 100644
 +		capst.header.pid = target_pid;
 +		if (capget(&capst.header, capst.data))
 +			bb_simple_perror_msg_and_die("capget");
++	}
++
++
+ 	/*
+ 	 * Entering the user namespace without --preserve-credentials implies
+ 	 * --setuid & --setgid and clearing root's groups.
+@@ -262,6 +297,47 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
+ 		/* Child continues */
+ 	}
+ 
++	/*
++	 * Entering the namespace with caps matching the target
++	 */
++	if ((opts & OPT_cap) && (opts & OPT_target)) {
++		int ret;
 +
 +		/* XXX: fix securebits
 +		securebits = prctl(PR_GET_SECUREBITS);
@@ -142,6 +163,3 @@ index 425d517..669fe29 100644
  	if (opts & OPT_setgid) {
  		if (setgroups(0, NULL) < 0 && setgroups_failed)
  			bb_simple_perror_msg_and_die("setgroups");
--- 
-2.43.0
-

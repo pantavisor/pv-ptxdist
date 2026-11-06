@@ -1,17 +1,31 @@
-From 27e7b68168214157b7c7c17a736ebaaff1cc7dd7 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alexander Sack <asac@pantacor.com>
-Date: Wed, 11 May 2022 17:00:13 +0200
-Subject: [PATCH 304/310] add support for FOLLOW_X_ROOT env; superseed
- ROOTFSDIR in turn
+Date: Mon, 23 May 2022 23:49:29 +0200
+Subject: [PATCH] mdev: support FOLLOW_X_ROOT and MDEV_CONF
 
+Let an mdev daemon work on the /dev of a root that is being prepared in
+a mount namespace and keep working after its pivot or switch root:
+FOLLOW_X_ROOT names that root and MDEV_CONF overrides /etc/mdev.conf.
+The config file is now opened once at startup, since the daemon may
+chroot away from it later.
+
+[fernando: squashed "add support for ROOTFSDIR and MDEV_CONF envs", "add
+ support for FOLLOW_X_ROOT env; superseed ROOTFSDIR in turn", "fix
+ depends in mdev.c for FOLLOW_X_ROOT config" and "add FOLLOW_X_PID
+ support for pantavisor mdev". ROOTFSDIR did not survive the series, and
+ FOLLOW_X_PID is left out: nothing uses it and it passed the string to
+ a %d, so it could not find the process.]
+(cherry picked from commit 2e99cb323f017bd88128cc0e21b07a9c720cae31)
 (cherry picked from commit f12cd7033f7f563e342a038f5e451be5976ced42)
+(cherry picked from commit fb3b7e1353d126be78cd6f4c329a3018db5161d0)
+(cherry picked from commit 838b5e51f408d1c68ce52734de6b5f09e5e3da13)
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
- util-linux/mdev.c | 73 +++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 58 insertions(+), 15 deletions(-)
+ util-linux/mdev.c | 77 ++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 66 insertions(+), 11 deletions(-)
 
 diff --git a/util-linux/mdev.c b/util-linux/mdev.c
-index 75725dc..f26533b 100644
+index e98d467..11a5f77 100644
 --- a/util-linux/mdev.c
 +++ b/util-linux/mdev.c
 @@ -74,6 +74,17 @@
@@ -22,7 +36,7 @@ index 75725dc..f26533b 100644
 +//config:config FEATURE_MDEV_FOLLOW_X_ROOT
 +//config:	bool "Support following a switch or pivot root in mount_namespace"
 +//config:	default y
-+//config:	depends on MDEV
++//config:	depends on FEATURE_MDEV_DAEMON
 +//config:	help
 +//config:	Add support for following a switch_root and pivot_root of pid 1
 +//config:	Useful for having mdev prefer the dev/ nodes of a root getting
@@ -52,7 +66,21 @@ index 75725dc..f26533b 100644
  #if ENABLE_FEATURE_MDEV_CONF
  
  static void make_default_cur_rule(void)
-@@ -575,6 +592,25 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -470,13 +487,6 @@ static const struct rule *next_rule(void)
+ {
+ 	struct rule *rule;
+ 
+-	/* Open conf file if we didn't do it yet */
+-	if (!G.parser && G.filename) {
+-		dbg3("config_open('%s')", G.filename);
+-		G.parser = config_open2(G.filename, fopen_for_read);
+-		G.filename = NULL;
+-	}
+-
+ 	if (G.rule_vec) {
+ 		/* mdev -s */
+ 		/* Do we have rule parsed already? */
+@@ -575,6 +585,25 @@ static void make_device(char *device_name, char *path, int operation)
  {
  	int major, minor, type, len;
  	char *path_end = path + strlen(path);
@@ -78,30 +106,11 @@ index 75725dc..f26533b 100644
  
  	/* Try to read major/minor string.  Note that the kernel puts \n after
  	 * the data, so we don't need to worry about null terminating the string
-@@ -893,18 +929,6 @@ static int FAST_FUNC dirAction(struct recursive_state *state,
- 	return (state->depth >= MAX_SYSFS_DEPTH ? SKIP : TRUE);
- }
- 
--static const char *getdevdir() {
--	static char *devdir = NULL;
--
--	if (!devdir) {
--		const char *rootfsdir = getenv("ROOTFSDIR");
--		devdir = malloc (sizeof(char) * PATH_MAX);
--		sprintf(devdir, "%s%s", rootfsdir ? rootfsdir : "", "/dev");
--	}
--	return devdir;
--}
--
--
- /* For the full gory details, see linux/Documentation/firmware_class/README
-  *
-  * Firmware loading works like this:
-@@ -965,7 +989,13 @@ static void load_firmware(const char *firmware, const char *sysfs_path)
+@@ -953,7 +982,13 @@ static void load_firmware(const char *firmware, const char *sysfs_path)
  		full_write(loading_fd, "-1", 2);
  
   out:
--	xchdir(getdevdir());
+-	xchdir("/dev");
 +#if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
 +	if (newrootdev)
 +		xchdir(newrootdev);
@@ -112,11 +121,11 @@ index 75725dc..f26533b 100644
  	if (ENABLE_FEATURE_CLEAN_UP) {
  		close(firmware_fd);
  		close(loading_fd);
-@@ -1268,14 +1298,27 @@ int mdev_main(int argc UNUSED_PARAM, char **argv)
+@@ -1256,20 +1291,40 @@ int mdev_main(int argc UNUSED_PARAM, char **argv)
  	/* Force the configuration file settings exactly */
  	umask(0);
  
--	xchdir(getdevdir());
+-	xchdir("/dev");
 -
  	opt = getopt32(argv, "^"
  		"sS" IF_FEATURE_MDEV_DAEMON("df") "v"
@@ -140,8 +149,19 @@ index 75725dc..f26533b 100644
 +
 +
  #if ENABLE_FEATURE_MDEV_CONF
- 	G.filename = getenv("MDEV_CONF") ? getenv("MDEV_CONF") : "/etc/mdev.conf";
+-	G.filename = "/etc/mdev.conf";
++	G.filename = getenv("MDEV_CONF") ? getenv("MDEV_CONF") : "/etc/mdev.conf";
  	if (opt & (MDEV_OPT_SCAN|MDEV_OPT_DAEMON)) {
--- 
-2.43.0
-
+ 		/* Same as xrealloc_vector(NULL, 4, 0): */
+ 		G.rule_vec = xzalloc((1 << 4) * sizeof(*G.rule_vec));
+ 	}
++
++	/* Open conf file if we didn't do it yet */
++	if (!G.parser && G.filename) {
++		dbg3("config_open('%s')", G.filename);
++		G.parser = config_open2(G.filename, fopen_for_read);
++		G.filename = NULL;
++	}
+ #endif
+ 
+ 	if (opt & MDEV_OPT_SYSLOG) {

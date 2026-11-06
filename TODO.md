@@ -14,7 +14,7 @@ Patches are based on PTXdist `master`, not on a release.
 |---|---|---|
 | mbedtls | Stock package, rule bumped to 2.28.10 (`rules/mbedtls.make`) | PTXdist patch to write |
 | dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | PTXdist patch to write |
-| busybox | Stock 1.38.0 + 11 Pantavisor patches | PTXdist patch to write |
+| busybox | Stock 1.38.0 + 5 Pantavisor patches | PTXdist patch to write |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
 | lxc | Still `lxc-pv` | Bump ready in `upstream/ptxdist/`; 15 of 41 fork commits ready |
 | libevent | Still `libevent-pv` 2.2.1-alpha | Blocked |
@@ -31,11 +31,22 @@ Patches are based on PTXdist `master`, not on a release.
       `rules/dropbear.{in,make,postinst}` and PTXdist's. The postinst guard
       matches openssh's. Without it, enabling dropbear selects INITMETHOD,
       whose default is systemd.
-- [ ] **busybox: add the Pantavisor patches.** Add 0300-0310 to
+- [ ] **busybox: fix the `mdev -s` crash first.** `0304` (MODALIAS) segfaults
+      on any PCI device without `DEVNAME` as soon as `mdev.conf` has a
+      device-name rule: `make_device()` passes a NULL `device_name` to
+      `regexec()`. The `FOLLOW_X_ROOT` daemon dies the same way in its initial
+      scan, and `drivers.c` runs `mdev -s`. Seen on qemu-arm64 and natively;
+      the series before the squash has it too. Just `continue` on NULL is not
+      enough: it loops forever on the default rule, so the fix must also
+      end the rule loop there.
+- [ ] **busybox: add the Pantavisor patches.** Add 0300-0304 to
       PTXdist's `patches/busybox-1.38.0/series`, and put
       `FEATURE_MDEV_FOLLOW_X_ROOT` into `config/busybox/util-linux/Config.in`.
       That lets `rules/busybox-pantavisor.in` go away (a layer can only
       override all of `config/busybox`, so it lives there for now).
+      Clean them up first: `0300` turns nsenter's `-F` into `F::`, so it
+      takes an optional argument, and the series leaves unused variables
+      (`securebits`, `m`, `ret` in nsenter, `subsys`, `res` in mdev).
 - [ ] **lxc: version bump 3.0.1 -> 3.0.4.** Ready:
       `upstream/ptxdist/0001-lxc-version-bump-3.0.1-3.0.4.patch`. Also fixes
       `LXC_LICENSE := unknown`.
@@ -50,10 +61,9 @@ least reviewed. Where that is possible, send them there first:
 - [ ] **dropbear `-n` any-user mode** (`patches/dropbear-2026.94/0200-*`):
       offer it to dropbear upstream (Matt Johnston). If it is refused,
       the RFC has to argue for carrying it in PTXdist.
-- [ ] **busybox patches**, mostly generic: nsenter/unshare `-C`, nsenter
-      `--caps`, the netlink and MODALIAS fixes. Send them to the busybox
-      list; `FOLLOW_X_ROOT`/`FOLLOW_X_PID` and wget `unix_proxy` are more
-      Pantavisor-specific.
+- [ ] **busybox patches**, mostly generic: nsenter `-C` and `--caps`, the
+      netlink and MODALIAS fixes. Send them to the busybox list;
+      `FOLLOW_X_ROOT` is more Pantavisor-specific.
 - [ ] **Pantavisor** (Pantacor's repo, easy):
   - [ ] Merge `patches/pantavisor-030/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch`.
   - [ ] Drop `#include <lxc/pv_export.h>` from `plugins/pv_lxc.c`.
