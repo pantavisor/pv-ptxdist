@@ -16,7 +16,7 @@ Patches are based on PTXdist `master`, not on a release.
 | dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | PTXdist patch to write |
 | busybox | Stock 1.38.0 + 5 Pantavisor patches | PTXdist patch to write |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
-| lxc | Still `lxc-pv` (LXC 3 fork, `06b49c1d`) | Bump ready in `upstream/ptxdist/`; 15 of 44 fork commits ready; see the LXC 6 question in section 7 |
+| lxc | `lxc6-pv` (LXC 6 fork, `bfa6810a`); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump PTXdist's lxc 3.0.1 to 6.0.x (meson) plus 11 fork patches; see section 3 |
 | libevent | Still `libevent-pv` 2.2.1-alpha | Blocked |
 | picohttpparser, libthttp, pantavisor | Layer packages | The RFC itself |
 
@@ -47,9 +47,10 @@ Patches are based on PTXdist `master`, not on a release.
       Clean them up first: `0300` turns nsenter's `-F` into `F::`, so it
       takes an optional argument, and the series leaves unused variables
       (`securebits`, `m`, `ret` in nsenter, `subsys`, `res` in mdev).
-- [ ] **lxc: version bump 3.0.1 -> 3.0.4.** Ready:
-      `upstream/ptxdist/0001-lxc-version-bump-3.0.1-3.0.4.patch`. Also fixes
-      `LXC_LICENSE := unknown`.
+- [ ] **lxc: version bump 3.0.1 -> 6.0.6.** A rewrite of PTXdist's rule
+      to meson; `rules/lxc6-pv.make` has the pinned option list to start
+      from. Fixes `LXC_LICENSE := unknown` too. The 3.0.4 bump in
+      `upstream/ptxdist/` is obsolete with the move to LXC 6.
 - [ ] Before sending each one, rebase it on current PTXdist master and run
       `ptxdist lint` and `ptxdist licensecheck <pkg>`.
 
@@ -70,66 +71,58 @@ least reviewed. Where that is possible, send them there first:
         Nothing uses it, and it is the only reason lxc would need to
         install that header.
   - [ ] Test setting `lxc.cgroup.dir` to `lxc/<name>` per container, so
-        that lxc's default `lxc.payload.` prefix can stay (see 3.D).
-- [ ] lxc 3.0 has been end-of-life since 2023, so there is nowhere upstream
-      to send the lxc fork patches. PTXdist carrying them is the only route.
+        that lxc's default `lxc.payload.` prefix can stay (section 3).
+- [ ] **lxc 6 fork patches**: LXC 6.0 is maintained (LTS), so send the
+      generic ones in section 3 to `lxc/lxc` first, before PTXdist.
 
-## 3. lxc: replace lxc-pv with stock lxc + patches
+## 3. lxc: replace lxc6-pv with stock lxc 6 + patches
 
-### Ready (B and C)
+The layer builds `lxc6-pv`, meta-pantavisor's LXC 6 fork
+(`stable-6.0-BASE-f9ff9ea2a` at `bfa6810a`): upstream `stable-6.0` (v6.0.5
++ 17 upstream commits) plus 14 Pantavisor commits, and meta-pantavisor's
+patch that stops meson forcing the gold linker. Pantavisor runs it with
+`PV_SYSTEM_CGROUP_VERSION=auto`, so cgroup v2 on our kernels (they have
+`CGROUP_BPF`). LXC 3 (`lxc-pv`) stays as the deprecated menu choice.
 
-`upstream/ptxdist/patches/lxc-3.0.4/`, 15 patches. They build with GCC 15
-and no warnings, and everything `pv_lxc.c` uses is present. Not yet run
-under Pantavisor.
+### Generic: send to lxc upstream, then carry in PTXdist
 
-- [ ] Fold the series into a PTXdist patch, after the 3.0.4 bump.
-- [ ] Decide on `0002` (no `container=` for `pv-root`). It hardcodes a
-      Pantavisor name in lxc; an empty type meaning "do not set it" would
-      be generic, but then Pantavisor has to pass `""`.
-- [ ] Decide on `0011`. It makes `LXC_LOG_BUFFER_SIZE` 8x bigger
-      (4096 -> 32768) for every user; it could be smaller, or configurable.
-- [ ] Squash `0003`, `0005` and `0006` (init.cmd parsing) into one patch,
-      if the authors agree to a co-authored commit.
+- [ ] `9343fe09` block SIGCHLD in run_buffer (a fix).
+- [ ] `04fe2f99` conf: match pivot_root mount propagation in lxc_chroot
+      (a fix).
+- [ ] `5efac56d` lxc_string_split_quoted: handle escaped characters.
+- [ ] `aa2b45c3` hook commands with parameters.
+- [ ] `bfa6810a` the `lxc.tty.min` key.
+- [ ] `21cf380b` the `origin=mkdir` mount option.
+- [ ] `568fd7fd` the `lxc.rootfs.bdev_type` key.
+- [ ] The gold linker patch: check whether lxc main still forces gold.
 
-### New on the fork, not yet sorted
+### Pantavisor-specific: needs a rework first
 
-The fork gained three commits since the series was sorted:
-
-- [ ] `fd977239` conf: match pivot_root mount propagation in lxc_chroot.
-      Looks like a fix (B).
-- [ ] `99390fd9` and `06b49c1d`: the `lxc.tty.min` key and its fix. A new
-      key, off unless set, so it fits C. Squash the two.
-
-### Still to do (D): behaviour changes for every lxc user
-
-Each one needs a config key that is off by default, or a rework in
-Pantavisor, before upstream will take it.
-
-- [ ] **Following symlinks in mount targets**: `b03b9cde` `e66bd42c`
-      `4acd66a1` `78c77294` `bf4be7b0` `7aa1ad8a` `ab09a6a5` (realpath_x).
-      Stock lxc refuses symlinks in mount targets on purpose
-      (CVE-2015-1335). Put it behind a key such as
-      `lxc.mount.resolve_symlinks`, squash the series, and have it reviewed
-      for safety.
-- [ ] **`/exports`**: `da3d6e46` skips the umount of, and keeps shared, any
-      mount whose target contains the string `exports`. Make it a config
-      key that lists the paths, or move it into Pantavisor.
-- [ ] **cgroup prefix**: `ea36bada` changes `lxc.payload.` to `lxc/` for
-      everyone. Pantavisor's `cgroup.c` expects `lxc/<name>`. Try
+- [ ] `897b2c54` `set_container_type()` API. Hardcodes Pantavisor's
+      container type; make it generic or move the logic into Pantavisor.
+- [ ] `38180347` `realpath_x()`, following symlinks in mount targets inside
+      the rootfs. Stock lxc refuses them on purpose (CVE-2015-1335): put it
+      behind a config key and have it reviewed for safety.
+- [ ] `afa148a5` cgroup prefix `lxc.payload.` -> `lxc/` for everyone. Try
       `lxc.cgroup.dir` from Pantavisor (section 2) and drop the patch.
-- [ ] **overlay upper/work dirs**: `937c195c` drops the check that they are
-      inside the lxc path, so lxc will `mkdir -p` them anywhere on the host.
-      Put it behind a config key.
-- [ ] Then switch the layer from `lxc-pv` to stock `lxc` (with
-      `LXC_SYSTEMD_UNIT` off) and run the QEMU tests: containers start,
-      `fallbear-cmd` reaches them, `origin=mkdir` and configoverlay work.
+- [ ] `76489961` overlay upper/work dirs outside the container dir: put it
+      behind a config key.
+- [ ] `d99a550c` `/exports` mounts: make it a config key that lists the
+      paths, or move it into Pantavisor.
 
 ### Dropped, nothing to do
 
-`atom.mk`, CI, and `COPYING` churn; the ptmx add/revert; the static
-archive; `set_inherit_namespaces()` (unused). Also `setpgrp()` (reverted
-later in the fork), `ad43e43f` (fixes code that is not in 3.0.4), and
-`9113e476` (folded into the origin=mkdir port).
+`0f491096` `pv_export.h` (nothing uses it once Pantavisor drops the
+include, section 2) and `c2017d42` (rebase notes).
+
+### Validation
+
+- [ ] Run the QEMU tests on LXC 6 for every container feature
+      Pantavisor uses: `origin=mkdir`, configoverlay, `/exports`, the
+      `mdev` hook, `lxc.tty.min`, cgroup v1 (`PV_SYSTEM_CGROUP_VERSION=1`)
+      as well as v2.
+- [ ] Drop `upstream/ptxdist/` (the LXC 3 series) once the LXC 6 series
+      replaces it, and `lxc-pv` once nobody needs the deprecated choice.
 
 ## 4. libevent (blocker)
 
@@ -183,13 +176,8 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
 
 ## 7. Open questions for the cover letter
 
-- meta-pantavisor made LXC 6 (`lxc6-pv`) its default in `a7f70d56` and
-  moved the LXC 3 fork to an `lxc-deprecated` feature. This layer still
-  builds LXC 3. Moving to LXC 6 here first would replace most of section 3
-  (and the EOL question below) with a different patch set against a
-  maintained LXC.
-- Carrying 15+ patches against lxc 3.0 (EOL). Acceptable, or must
-  Pantavisor move to a maintained lxc first?
+- Carrying Pantavisor's LXC 6 patches (section 3) that lxc upstream does
+  not take: acceptable in PTXdist, or must they all land in lxc first?
 - libevent 2.2-alpha, or one of the alternatives in section 4.
 - The dropbear `-n` patch, if dropbear upstream does not take it.
 - A `pantavisor` init choice: Pantavisor is PID 1, so it could be an
