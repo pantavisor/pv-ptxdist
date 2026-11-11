@@ -1,10 +1,10 @@
-From 13ddeda019b3140c5ee762fe30520129c6008427 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alexander Sack <asac@pantacor.com>
 Date: Thu, 13 Jan 2022 13:24:14 +0100
-Subject: [PATCH 302/310] nsenter.c: add -C/--cgropup option similar to
- util-linux
+Subject: [PATCH] nsenter: add -C/--cgroup option similar to util-linux
 
 (cherry picked from commit c5b27f41a127eae8eecbcefda3d2cdbf9ad4ef91)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  util-linux/nsenter.c | 39 ++++++++++++++++++++++++---------------
  1 file changed, 24 insertions(+), 15 deletions(-)
@@ -108,6 +108,3 @@ index c857fc5..8b97295 100644
  			&ns_ctx_list[NS_IPC_POS].path,
  			&ns_ctx_list[NS_UTS_POS].path,
  			&ns_ctx_list[NS_NET_POS].path,
--- 
-2.43.0
-

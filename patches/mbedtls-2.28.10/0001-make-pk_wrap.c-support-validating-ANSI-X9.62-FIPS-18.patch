@@ -7,6 +7,8 @@ Subject: [PATCH 1/2] make pk_wrap.c support validating 'ANSI X9.62, FIPS
  - fallback in case verify failes due to ASN tag issues to (r,s)
  - encode (r,s) in asn.1 format to keep changes minimal
  - move helpers asn1_write_mpibuf and pk_ecdsa_sig_asn1_from_psa inside file
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  library/pk_wrap.c | 204 ++++++++++++++++++++++++++--------------------
  1 file changed, 117 insertions(+), 87 deletions(-)

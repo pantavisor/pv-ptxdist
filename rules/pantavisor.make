@@ -14,8 +14,8 @@ PACKAGES-$(PTXCONF_PANTAVISOR) += pantavisor
 #
 # Paths and names
 #
-PANTAVISOR_VERSION	:= 030
-PANTAVISOR_SHA256	:= f67ae2ada21bd3afd69d4d50a5eb66cf35ff9b0997b3c04e3b2bee5768cd7caa
+PANTAVISOR_VERSION	:= 031-rc8
+PANTAVISOR_SHA256	:= 7cc499dbba8d2e76ac9067a813731afe2f4cd7eb924d24a6cfeee202ef3cf292
 PANTAVISOR		:= pantavisor-$(PANTAVISOR_VERSION)
 PANTAVISOR_SUFFIX	:= tar.gz
 PANTAVISOR_URL		:= https://github.com/pantavisor/pantavisor.git;tag=$(PANTAVISOR_VERSION)
@@ -49,7 +49,7 @@ PANTAVISOR_CONF_OPT	:= \
 	-DPANTAVISOR_DISTRO_NAME=ptxdist \
 	-DPANTAVISOR_DISTRO_VERSION=$(PTXDIST_VERSION_FULL)
 
-# Consumed by gen_version.sh (see patches/pantavisor-030).
+# Consumed by gen_version.sh (see patches/pantavisor-031-rc8).
 PANTAVISOR_MAKE_ENV	:= \
 	PV_GIT_DESCRIBE=$(PANTAVISOR_VERSION)
 
@@ -61,6 +61,28 @@ PANTAVISOR_CFLAGS	:= \
 	-std=gnu17 \
 	-Wno-unused-result \
 	-Wno-error=implicit-function-declaration
+
+# ----------------------------------------------------------------------------
+# Install
+# ----------------------------------------------------------------------------
+
+# Since 031, the shipped config turns the secure boot handlers on, and with
+# them dm-verity checks of dm: volumes. Follow PANTAVISOR_DM_VERITY instead,
+# like meta-pantavisor does.
+# The shipped config sets no cgroup version, which means v1 in embedded
+# mode. Set it per LXC runtime, as meta-pantavisor's pvbase.bbclass does:
+# LXC 3 only has cgroup v1.
+PANTAVISOR_CGROUP_VERSION := $(call ptx/ifdef, PTXCONF_PANTAVISOR_LXC_DEPRECATED,1,auto)
+
+$(STATEDIR)/pantavisor.install:
+	@$(call targetinfo)
+	@$(call world/install, PANTAVISOR)
+	@sed -i 's/^PV_SECUREBOOT_HANDLERS=.*/PV_SECUREBOOT_HANDLERS=$(call ptx/ifdef, PTXCONF_PANTAVISOR_DM_VERITY,1,0)/' \
+		$(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@sed -i '/^PV_SYSTEM_CGROUP_VERSION=/d' $(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@echo 'PV_SYSTEM_CGROUP_VERSION=$(PANTAVISOR_CGROUP_VERSION)' >> \
+		$(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@$(call touch)
 
 # ----------------------------------------------------------------------------
 # Target-Install

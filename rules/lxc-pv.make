@@ -16,9 +16,9 @@ PACKAGES-$(PTXCONF_LXC_PV) += lxc-pv
 #
 # Pinned to the revision used by meta-pantavisor
 # (branch stable-3.0-BASE-2c5c780762981a5cfe699670c91397e29f6f6516).
-LXC_PV_COMMIT	:= c6bc8bc4af46a9250d250bad7b2e430d9fad1019
-LXC_PV_VERSION	:= 3.0.4-pv-c6bc8bc4
-LXC_PV_SHA256	:= 8ab93444189c14941842156f262ee79c136a38ada67c9878b79e37742b8c4d4a
+LXC_PV_COMMIT	:= 06b49c1d39dd6aac393cf1a6c739d74fd634b77e
+LXC_PV_VERSION	:= 3.0.4-pv-06b49c1d
+LXC_PV_SHA256	:= d2bd26ffb67cd494e89672298f6d951852b118cc55edc1037d99be9aa6c0068d
 LXC_PV		:= lxc-pv-$(LXC_PV_VERSION)
 LXC_PV_SUFFIX	:= tar.gz
 LXC_PV_URL	:= https://github.com/pantavisor/lxc.git;tag=$(LXC_PV_COMMIT)

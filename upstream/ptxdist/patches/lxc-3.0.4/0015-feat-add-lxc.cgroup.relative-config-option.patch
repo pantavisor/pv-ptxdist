@@ -1,0 +1,115 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Sun, 1 Feb 2026 12:57:50 +0000
+Subject: [PATCH 15/15] feat: add lxc.cgroup.relative config option
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/cgroups/cgfsng.c |  2 +-
+ src/lxc/conf.h           |  1 +
+ src/lxc/confile.c        | 39 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 41 insertions(+), 1 deletion(-)
+
+diff --git a/src/lxc/cgroups/cgfsng.c b/src/lxc/cgroups/cgfsng.c
+index ecd935f..b31c691 100644
+--- a/src/lxc/cgroups/cgfsng.c
++++ b/src/lxc/cgroups/cgfsng.c
+@@ -2707,7 +2707,7 @@ static bool cg_init(struct cgroup_ops *ops, struct lxc_conf *conf)
+ {
+ 	int ret;
+ 	const char *tmp;
+-	bool relative = false;
++	bool relative = conf ? conf->cgroup_meta.relative : false;
+ 
+ 	tmp = lxc_global_config_value("lxc.cgroup.use");
+ 	if (tmp) {
+diff --git a/src/lxc/conf.h b/src/lxc/conf.h
+index 5892f5d..0ee2918 100644
+--- a/src/lxc/conf.h
++++ b/src/lxc/conf.h
+@@ -79,6 +79,7 @@ struct lxc_cgroup {
+ 		struct /* meta */ {
+ 			char *controllers;
+ 			char *dir;
++			bool relative;
+ 		};
+ 	};
+ };
+diff --git a/src/lxc/confile.c b/src/lxc/confile.c
+index 03acfd4..1b275c0 100644
+--- a/src/lxc/confile.c
++++ b/src/lxc/confile.c
+@@ -153,6 +153,10 @@ lxc_config_define(uts_name);
+ lxc_config_define(sysctl);
+ lxc_config_define(proc);
+ 
++static int set_config_cgroup_relative(const char *, const char *, struct lxc_conf *, void *);
++static int get_config_cgroup_relative(const char *, char *, int, struct lxc_conf *, void *);
++static int clr_config_cgroup_relative(const char *, struct lxc_conf *, void *);
++
+ static struct lxc_config_t config_jump_table[] = {
+ 	{ "lxc.arch",                      set_config_personality,                 get_config_personality,                 clr_config_personality,               },
+ 	{ "lxc.apparmor.profile",          set_config_apparmor_profile,            get_config_apparmor_profile,            clr_config_apparmor_profile,          },
+@@ -162,6 +166,7 @@ static struct lxc_config_t config_jump_table[] = {
+ 	{ "lxc.cap.keep",                  set_config_cap_keep,                    get_config_cap_keep,                    clr_config_cap_keep,                  },
+ 	{ "lxc.cgroup2",                   set_config_cgroup2_controller,          get_config_cgroup2_controller,          clr_config_cgroup2_controller,        },
+ 	{ "lxc.cgroup.dir",                set_config_cgroup_dir,                  get_config_cgroup_dir,                  clr_config_cgroup_dir,                },
++	{ "lxc.cgroup.relative",           set_config_cgroup_relative,             get_config_cgroup_relative,             clr_config_cgroup_relative,           },
+ 	{ "lxc.cgroup",                    set_config_cgroup_controller,           get_config_cgroup_controller,           clr_config_cgroup_controller,         },
+ 	{ "lxc.console.buffer.size",       set_config_console_buffer_size,         get_config_console_buffer_size,         clr_config_console_buffer_size,       },
+ 	{ "lxc.console.logfile",           set_config_console_logfile,             get_config_console_logfile,             clr_config_console_logfile,           },
+@@ -1317,6 +1322,24 @@ static int set_config_cgroup_dir(const char *key, const char *value,
+ 	return set_config_string_item(&lxc_conf->cgroup_meta.dir, value);
+ }
+ 
++static int set_config_cgroup_relative(const char *key, const char *value,
++				      struct lxc_conf *lxc_conf, void *data)
++{
++	int ret;
++	int v;
++
++	if (lxc_config_value_empty(value))
++		return clr_config_cgroup_relative(key, lxc_conf, NULL);
++
++	ret = lxc_safe_int(value, &v);
++	if (ret < 0)
++		return -1;
++
++	lxc_conf->cgroup_meta.relative = !!v;
++
++	return 0;
++}
++
+ static bool parse_limit_value(const char **value, rlim_t *res)
+ {
+ 	char *endptr = NULL;
+@@ -3137,6 +3160,15 @@ static int get_config_cgroup_dir(const char *key, char *retv, int inlen,
+ 	return fulllen;
+ }
+ 
++static int get_config_cgroup_relative(const char *key, char *retv, int inlen,
++				      struct lxc_conf *lxc_conf, void *data)
++{
++	int len;
++	int fulllen = 0;
++
++	return lxc_get_conf_int(lxc_conf, retv, inlen, lxc_conf->cgroup_meta.relative);
++}
++
+ static int get_config_idmaps(const char *key, char *retv, int inlen,
+ 			     struct lxc_conf *c, void *data)
+ {
+@@ -3866,6 +3898,13 @@ static int clr_config_cgroup_dir(const char *key, struct lxc_conf *lxc_conf,
+ 	return 0;
+ }
+ 
++static int clr_config_cgroup_relative(const char *key, struct lxc_conf *lxc_conf,
++				      void *data)
++{
++	lxc_conf->cgroup_meta.relative = false;
++	return 0;
++}
++
+ static inline int clr_config_idmaps(const char *key, struct lxc_conf *c,
+ 				    void *data)
+ {

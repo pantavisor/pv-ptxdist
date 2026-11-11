@@ -1,0 +1,71 @@
+# -*-makefile-*-
+#
+# Copyright (C) 2019 by Bjoern Esser <bes@pengutronix.de>
+#               2022 by Michael Olbrich <m.olbrich@pengutronix.de>
+#
+# For further information about the PTXdist project and license conditions
+# see the README file.
+#
+
+#
+# We provide this package
+#
+PACKAGES-$(PTXCONF_MBEDTLS) += mbedtls
+
+#
+# Paths and names
+#
+MBEDTLS_VERSION		:= 2.28.10
+MBEDTLS_SHA256		:= 0f2e0525903a89ae1d39ce439d858be66933bda54c5b6102b72a29ed8fe7c088
+MBEDTLS			:= mbedtls-$(MBEDTLS_VERSION)
+MBEDTLS_SUFFIX		:= tar.gz
+MBEDTLS_URL		:= https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v$(MBEDTLS_VERSION).$(MBEDTLS_SUFFIX)
+MBEDTLS_SOURCE		:= $(SRCDIR)/$(MBEDTLS).$(MBEDTLS_SUFFIX)
+MBEDTLS_DIR		:= $(BUILDDIR)/$(MBEDTLS)
+MBEDTLS_LICENSE		:= Apache-2.0 OR GPL-2.0-or-later
+MBEDTLS_LICENSE_FILES	:= file://LICENSE;md5=379d5819937a6c2f1ef1630d341e026d
+
+# ----------------------------------------------------------------------------
+# Prepare
+# ----------------------------------------------------------------------------
+
+#
+# cmake
+#
+MBEDTLS_CONF_TOOL	:= cmake
+MBEDTLS_CONF_OPT	:= \
+	$(CROSS_CMAKE_USR) \
+	-DENABLE_PROGRAMS=OFF \
+	-DENABLE_TESTING=OFF \
+	-DENABLE_ZLIB_SUPPORT=ON \
+	-DINSTALL_MBEDTLS_HEADERS=ON \
+	-DLINK_WITH_PTHREAD=ON \
+	-DLINK_WITH_TRUSTED_STORAGE=OFF \
+	-DMBEDTLS_FATAL_WARNINGS=OFF \
+	-DUNSAFE_BUILD=OFF \
+	-DUSE_PKCS11_HELPER_LIBRARY=OFF \
+	-DUSE_SHARED_MBEDTLS_LIBRARY=ON \
+	-DUSE_STATIC_MBEDTLS_LIBRARY=OFF
+
+# ----------------------------------------------------------------------------
+# Target-Install
+# ----------------------------------------------------------------------------
+
+$(STATEDIR)/mbedtls.targetinstall:
+	@$(call targetinfo)
+
+	@$(call install_init, mbedtls)
+	@$(call install_fixup, mbedtls,PRIORITY,optional)
+	@$(call install_fixup, mbedtls,SECTION,base)
+	@$(call install_fixup, mbedtls,AUTHOR,"Bjoern Esser <bes@pengutronix.de>")
+	@$(call install_fixup, mbedtls,DESCRIPTION,missing)
+
+	@$(call install_lib, mbedtls, 0, 0, 0644, libmbedcrypto)
+	@$(call install_lib, mbedtls, 0, 0, 0644, libmbedtls)
+	@$(call install_lib, mbedtls, 0, 0, 0644, libmbedx509)
+
+	@$(call install_finish, mbedtls)
+
+	@$(call touch)
+
+# vim: syntax=make

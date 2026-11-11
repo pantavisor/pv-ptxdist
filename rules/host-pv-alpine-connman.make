@@ -17,7 +17,7 @@ HOST_PACKAGES-$(PTXCONF_HOST_PV_ALPINE_CONNMAN) += host-pv-alpine-connman
 # From https://pantavisor-ci.s3.amazonaws.com/meta-pantavisor/containers-releases.json
 # (the list behind pantavisor.io/downloads). Only release candidates are
 # published there so far.
-HOST_PV_ALPINE_CONNMAN_VERSION	:= 031-rc2
+HOST_PV_ALPINE_CONNMAN_VERSION	:= 031-rc8
 ifdef PTXCONF_ARCH_ARM64
 HOST_PV_ALPINE_CONNMAN_MACHINE	:= armv8
 HOST_PV_ALPINE_CONNMAN_SHA256	:= e39b5dbd93c1d035880b4c74e5d452cba68208862acfa01571869fbd964a5a5a

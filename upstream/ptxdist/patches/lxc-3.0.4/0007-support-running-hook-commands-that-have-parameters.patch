@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Wed, 15 Dec 2021 00:55:47 +0100
+Subject: [PATCH 07/15] support running hook commands that have parameters
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/conf.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/lxc/conf.c b/src/lxc/conf.c
+index 62439e8..6383f70 100644
+--- a/src/lxc/conf.c
++++ b/src/lxc/conf.c
+@@ -3407,9 +3407,18 @@ static bool verify_start_hooks(struct lxc_conf *conf)
+ 		int ret;
+ 		char *hookname = it->elem;
+ 
++		char *cmdend = strchr (hookname, ' ');
++		char sav;
++		if (cmdend) {
++			sav = *cmdend;
++			*cmdend = 0;
++		}
+ 		ret = snprintf(path, PATH_MAX, "%s%s",
+ 			       conf->rootfs.path ? conf->rootfs.mount : "",
+ 			       hookname);
++		if (cmdend)
++			*cmdend = sav;
++
+ 		if (ret < 0 || ret >= PATH_MAX)
+ 			return false;
+ 

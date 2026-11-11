@@ -1,0 +1,222 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Felipe Ortiz <felipe.ortiz@pantacor.com>
+Date: Thu, 22 Sep 2022 09:48:46 -0300
+Subject: [PATCH 08/15] Add lxc_log_pipe to allow to read lxc logs
+ programmatically
+
+Add log_write_to_fd to share code between different log functions
+
+Allow lxc logs on logpipe without setting a file path
+
+Change pipe by logfd in lxc_log structure
+
+Restore a deleted include
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/log.c          | 92 ++++++++++++++++++++++++++++++------------
+ src/lxc/log.h          |  1 +
+ src/lxc/lxccontainer.h |  7 ++++
+ src/lxc/start.c        |  2 +-
+ 4 files changed, 76 insertions(+), 26 deletions(-)
+
+diff --git a/src/lxc/log.c b/src/lxc/log.c
+index d5822c3..58feb48 100644
+--- a/src/lxc/log.c
++++ b/src/lxc/log.c
+@@ -64,6 +64,7 @@
+ #define LXC_LOG_TIME_SIZE ((INTTYPE_TO_STRLEN(uint64_t)) * 2)
+ 
+ int lxc_log_fd = -1;
++int lxc_log_out_fd = -1;
+ static int syslog_enable = 0;
+ int lxc_quiet_specified;
+ int lxc_log_use_global_fd;
+@@ -317,29 +318,14 @@ static int lxc_unix_epoch_to_utc(char *buf, size_t bufsize, const struct timespe
+  * themselves. Our logging is mostly done for debugging purposes so don't try
+  * to make it pretty. Pretty might cost you thread-safety.
+  */
+-static int log_append_logfile(const struct lxc_log_appender *appender,
+-			      struct lxc_log_event *event)
++
++static int log_write_to_fd(struct lxc_log_event *event, int fd)
+ {
+ 	char buffer[LXC_LOG_BUFFER_SIZE];
+ 	char date_time[LXC_LOG_TIME_SIZE];
+ 	int n;
+ 	ssize_t ret;
+-	int fd_to_use = -1;
+-	const char *log_container_name;
+-
+-#ifndef NO_LXC_CONF
+-	if (current_config)
+-		if (!lxc_log_use_global_fd)
+-			fd_to_use = current_config->logfd;
+-#endif
+-
+-	log_container_name = lxc_log_get_container_name();
+-
+-	if (fd_to_use == -1)
+-		fd_to_use = lxc_log_fd;
+-
+-	if (fd_to_use == -1)
+-		return 0;
++	const char *log_container_name = lxc_log_get_container_name();
+ 
+ 	if (lxc_unix_epoch_to_utc(date_time, LXC_LOG_TIME_SIZE, &event->timestamp) < 0)
+ 		return -1;
+@@ -373,7 +359,35 @@ static int log_append_logfile(const struct lxc_log_appender *appender,
+ 
+ 	buffer[n] = '\n';
+ 
+-	return lxc_write_nointr(fd_to_use, buffer, n + 1);
++	return lxc_write_nointr(fd, buffer, n + 1);
++}
++
++static int log_append_out_fd(const struct lxc_log_appender *appender,
++			   struct lxc_log_event *event)
++{
++	if (lxc_log_out_fd < 0)
++		return 0;
++
++	return log_write_to_fd(event, lxc_log_out_fd);
++}
++
++static int log_append_logfile(const struct lxc_log_appender *appender,
++			      struct lxc_log_event *event)
++{
++	int fd_to_use = -1;
++
++#ifndef NO_LXC_CONF
++	if (current_config)
++		if (!lxc_log_use_global_fd)
++			fd_to_use = current_config->logfd;
++#endif
++	if (fd_to_use == -1)
++		fd_to_use = lxc_log_fd;
++
++	if (fd_to_use == -1)
++		return 0;
++
++	return log_write_to_fd(event, fd_to_use);
+ }
+ 
+ #if HAVE_DLOG
+@@ -445,6 +459,12 @@ static struct lxc_log_appender log_appender_logfile = {
+ 	.next		= NULL,
+ };
+ 
++static struct lxc_log_appender log_appender_out_fd = {
++	.name		= "pipe",
++	.append		= log_append_out_fd,
++	.next		= NULL,
++};
++
+ #if HAVE_DLOG
+ static struct lxc_log_appender log_appender_dlog = {
+ 	.name		= "dlog",
+@@ -692,11 +712,7 @@ int lxc_log_init(struct lxc_log *log)
+ 		}
+ 
+ 		lxc_log_use_global_fd = 1;
+-	} else {
+-		/* if no name was specified, there nothing to do */
+-		if (!log->name)
+-			return 0;
+-
++	} else if (log->name) {
+ 		ret = -1;
+ 
+ 		if (!log->lxcpath)
+@@ -720,7 +736,7 @@ int lxc_log_init(struct lxc_log *log)
+ 	 * ignore failures and continue logging to console
+ 	 */
+ 	if (!log->file && ret != 0) {
+-		INFO("Ignoring failure to open default logfile");
++		INFO("No logfile open");
+ 		ret = 0;
+ 	}
+ 
+@@ -732,6 +748,27 @@ int lxc_log_init(struct lxc_log *log)
+ 	return ret;
+ }
+ 
++int lxc_log_set_alternative_output(int fd)
++{
++	if (fd < -1)
++		return -1;
++
++	lxc_log_out_fd = fcntl(fd, F_DUPFD_CLOEXEC, STDERR_FILENO);
++
++	if (lxc_log_out_fd == -1)
++		return -1;
++
++	close(fd);
++	fd = -1;
++
++	struct lxc_log_appender *p = lxc_log_category_lxc.appender;
++	while (p->next)
++		p = p->next;
++
++	p->next = &log_appender_out_fd;
++	return 0;
++}
++
+ void lxc_log_close(void)
+ {
+ 	closelog();
+@@ -739,6 +776,11 @@ void lxc_log_close(void)
+ 	free(log_vmname);
+ 	log_vmname = NULL;
+ 
++	if (lxc_log_out_fd > -1) {
++		close(lxc_log_out_fd);
++		lxc_log_out_fd = -1;
++	}
++
+ 	if (lxc_log_fd == -1)
+ 		return;
+ 
+diff --git a/src/lxc/log.h b/src/lxc/log.h
+index 5afe4e0..b026b0b 100644
+--- a/src/lxc/log.h
++++ b/src/lxc/log.h
+@@ -506,6 +506,7 @@ ATTR_UNUSED static inline void LXC_##LEVEL(struct lxc_log_locinfo* locinfo,	\
+ #endif
+ 
+ extern int lxc_log_fd;
++extern int lxc_log_out_fd;
+ 
+ extern int lxc_log_syslog(int facility);
+ extern void lxc_log_enable_syslog(void);
+diff --git a/src/lxc/lxccontainer.h b/src/lxc/lxccontainer.h
+index 0b82129..d05d3d5 100644
+--- a/src/lxc/lxccontainer.h
++++ b/src/lxc/lxccontainer.h
+@@ -1104,6 +1104,13 @@ struct lxc_log {
+  */
+ int lxc_log_init(struct lxc_log *log);
+ 
++/*!
++ * \brief set a file descriptor to be used as alternative output
++ *
++ * \param fd file descriptor to write the output.
++ */
++int lxc_log_set_alternative_output(int fd);
++
+ /*!
+  * \brief Close log file.
+  */
+diff --git a/src/lxc/start.c b/src/lxc/start.c
+index 8f804df..32dab6e 100644
+--- a/src/lxc/start.c
++++ b/src/lxc/start.c
+@@ -274,7 +274,7 @@ restart:
+ 			if (fds_to_ignore[i] == fd)
+ 				break;
+ 
+-		if (fd == fddir || fd == lxc_log_fd ||
++		if (fd == fddir || fd == lxc_log_fd || fd == lxc_log_out_fd ||
+ 		    (i < len_fds && fd == fds_to_ignore[i]))
+ 			continue;
+ 

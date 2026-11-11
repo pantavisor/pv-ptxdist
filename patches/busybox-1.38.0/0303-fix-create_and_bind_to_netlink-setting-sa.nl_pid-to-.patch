@@ -1,10 +1,11 @@
-From 77f265e1c59a4f7e92b9e1f50e76214e1da694c3 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alexander Sack <asac@pantacor.com>
 Date: Tue, 7 Feb 2023 09:08:11 +0100
-Subject: [PATCH 307/310] fix create_and_bind_to_netlink setting sa.nl_pid to
+Subject: [PATCH] fix create_and_bind_to_netlink setting sa.nl_pid to
  potentially not system unique value
 
 (cherry picked from commit 5b34ff9e9804b11f851c2c0e6782e015de6e790f)
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  libbb/xconnect.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
@@ -22,6 +23,3 @@ index 095f7ff..e99c59b 100644
  	sa.nl_groups = grp;
  	xbind(fd, (struct sockaddr *) &sa, sizeof(sa));
  	close_on_exec_on(fd);
--- 
-2.43.0
-

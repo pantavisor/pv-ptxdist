@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?An=C3=ADbal=20Portero=20Hermida?=
+ <anibal.portero@pantacor.com>
+Date: Mon, 9 Oct 2023 11:00:40 +0200
+Subject: [PATCH 12/15] fix void arg prototypes
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/log.c             | 4 ++--
+ src/lxc/tools/arguments.c | 2 +-
+ src/lxc/tools/lxc_copy.c  | 2 +-
+ src/lxc/utils.c           | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/lxc/log.c b/src/lxc/log.c
+index 58feb48..60bd089 100644
+--- a/src/lxc/log.c
++++ b/src/lxc/log.c
+@@ -103,7 +103,7 @@ static int lxc_log_priority_to_syslog(int priority)
+ 	return LOG_NOTICE;
+ }
+ 
+-static const char *lxc_log_get_container_name()
++static const char *lxc_log_get_container_name(void)
+ {
+ #ifndef NO_LXC_CONF
+ 	if (current_config && !log_vmname)
+@@ -894,7 +894,7 @@ inline const char *lxc_log_get_prefix(void)
+ 	return log_prefix;
+ }
+ 
+-inline void lxc_log_options_no_override()
++inline void lxc_log_options_no_override(void)
+ {
+ 	lxc_quiet_specified = 1;
+ 	lxc_loglevel_specified = 1;
+diff --git a/src/lxc/tools/arguments.c b/src/lxc/tools/arguments.c
+index 859a9fb..56ec2ed 100644
+--- a/src/lxc/tools/arguments.c
++++ b/src/lxc/tools/arguments.c
+@@ -138,7 +138,7 @@ __noreturn static void print_usage_exit(const struct option longopts[],
+ 	exit(EXIT_SUCCESS);
+ }
+ 
+-__noreturn static void print_version_exit()
++__noreturn static void print_version_exit(void)
+ {
+ 	printf("%s\n", lxc_get_version());
+ 	exit(EXIT_SUCCESS);
+diff --git a/src/lxc/tools/lxc_copy.c b/src/lxc/tools/lxc_copy.c
+index 954f1dd..f17cdf7 100644
+--- a/src/lxc/tools/lxc_copy.c
++++ b/src/lxc/tools/lxc_copy.c
+@@ -522,7 +522,7 @@ static int do_clone_task(struct lxc_container *c, enum task task, int flags,
+ 	return ret;
+ }
+ 
+-static void free_mnts()
++static void free_mnts(void)
+ {
+ 	unsigned int i;
+ 	struct mnts *n = NULL;
+diff --git a/src/lxc/utils.c b/src/lxc/utils.c
+index f3ce2b2..b3a8bf3 100644
+--- a/src/lxc/utils.c
++++ b/src/lxc/utils.c
+@@ -253,7 +253,7 @@ int mkdir_p(const char *dir, mode_t mode)
+ 	return 0;
+ }
+ 
+-char *get_rundir()
++char *get_rundir(void)
+ {
+ 	char *rundir;
+ 	const char *homedir;

@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Wed, 17 Feb 2021 12:14:08 +0100
+Subject: [PATCH 05/15] fix bug in initcmd split that would cut the rightmost
+ char for whitespaced tokened components that dont have a leading/trailing "
+ (quote)
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ src/lxc/lxccontainer.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/lxc/lxccontainer.c b/src/lxc/lxccontainer.c
+index 02069cd..ab8ebe0 100644
+--- a/src/lxc/lxccontainer.c
++++ b/src/lxc/lxccontainer.c
+@@ -789,10 +789,11 @@ static char **split_init_cmd(const char *incmd)
+ 			continue;
+ 		} else if (tlen) {
+ 			tlen += strlen(p);
++			tlen++;
+ 			t = realloc(t, (tlen+1) * sizeof(char));
+ 			t = strcat(t, p);
+ 			if (p[strlen(p)-1] == '\"') {
+-				t[tlen-1] = '\0';
++				t[tlen-2] = '\0';
+ 				push_arg(&argv, t, &nargs);
+ 				tlen = 0;
+ 				free(t);
