@@ -5,7 +5,26 @@ config LIBTHTTP
 	prompt "libthttp"
 	select HOST_CMAKE
 	select MBEDTLS
+	select HOST_SYSTEM_PYTHON3
 	help
 	  Tiny HTTP/REST client library used by Pantavisor to talk to
 	  Pantahub. The library itself is static; only the TLS root
 	  certificates are installed on the target.
+
+config LIBTHTTP_CA_CERTS
+	string
+	depends on LIBTHTTP
+	prompt "TLS root certificates"
+	default "ISRG_Root_X1 ISRG_Root_X2 DigiCert_Global_Root_G2 DigiCert_Global_Root_G3 DigiCert_TLS_RSA4096_Root_G5 DigiCert_TLS_ECC_P384_Root_G5 USERTrust_RSA_Certification_Authority USERTrust_ECC_Certification_Authority COMODO_RSA_Certification_Authority COMODO_ECC_Certification_Authority Sectigo_Public_Server_Authentication_Root_R46 Sectigo_Public_Server_Authentication_Root_E46 GlobalSign_Root_CA_-_R3 GlobalSign_Root_CA_-_R6 GlobalSign_ECC_Root_CA_-_R4 GlobalSign_ECC_Root_CA_-_R5 GlobalSign_Root_R46 GlobalSign_Root_E46 GTS_Root_R1 GTS_Root_R3 GTS_Root_R4 Amazon_Root_CA_1 Amazon_Root_CA_2 Amazon_Root_CA_3 Amazon_Root_CA_4"
+	help
+	  Root CAs installed to /etc/thttp/certs, the trust store
+	  Pantavisor uses for HTTPS (PV_LIBTHTTP_CERTSDIR). Names are
+	  certificate labels from the Mozilla list, with spaces as
+	  underscores, as PTXdist's ca-certificates package writes them.
+	  Every file must parse with mbed TLS, or Pantavisor refuses the
+	  whole directory.
+
+	  The default is the roots of Let's Encrypt (ISRG), DigiCert,
+	  Sectigo, GlobalSign, Google Trust Services and Amazon, the same
+	  set as meta-pantavisor's PV_TLS_CA_CERTS. A name missing from
+	  the list is skipped with a warning.
