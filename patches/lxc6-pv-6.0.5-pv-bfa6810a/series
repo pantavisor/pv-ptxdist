@@ -1,0 +1,2 @@
+# from meta-pantavisor recipes-pv/lxc6-pv/files
+0001-meson-do-not-force-gold-linker.patch

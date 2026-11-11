@@ -69,10 +69,18 @@ PANTAVISOR_CFLAGS	:= \
 # Since 031, the shipped config turns the secure boot handlers on, and with
 # them dm-verity checks of dm: volumes. Follow PANTAVISOR_DM_VERITY instead,
 # like meta-pantavisor does.
+# The shipped config sets no cgroup version, which means v1 in embedded
+# mode. Set it per LXC runtime, as meta-pantavisor's pvbase.bbclass does:
+# LXC 3 only has cgroup v1.
+PANTAVISOR_CGROUP_VERSION := $(call ptx/ifdef, PTXCONF_PANTAVISOR_LXC_DEPRECATED,1,auto)
+
 $(STATEDIR)/pantavisor.install:
 	@$(call targetinfo)
 	@$(call world/install, PANTAVISOR)
 	@sed -i 's/^PV_SECUREBOOT_HANDLERS=.*/PV_SECUREBOOT_HANDLERS=$(call ptx/ifdef, PTXCONF_PANTAVISOR_DM_VERITY,1,0)/' \
+		$(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@sed -i '/^PV_SYSTEM_CGROUP_VERSION=/d' $(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@echo 'PV_SYSTEM_CGROUP_VERSION=$(PANTAVISOR_CGROUP_VERSION)' >> \
 		$(PANTAVISOR_PKGDIR)/etc/pantavisor.config
 	@$(call touch)
 

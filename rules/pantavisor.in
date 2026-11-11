@@ -7,7 +7,8 @@ menuconfig PANTAVISOR
 	select LIBTHTTP
 	select PICOHTTPPARSER
 	select MBEDTLS
-	select LXC_PV
+	select LXC6_PV				if PANTAVISOR_LXC_STABLE
+	select LXC_PV				if PANTAVISOR_LXC_DEPRECATED
 	select ZLIB
 	select LIBEVENT_PV
 	select LIBC_DL
@@ -36,6 +37,28 @@ menuconfig PANTAVISOR
 	  initramfs (/init -> /usr/bin/pantavisor).
 
 if PANTAVISOR
+
+choice
+	prompt "LXC runtime"
+	default PANTAVISOR_LXC_STABLE
+
+config PANTAVISOR_LXC_STABLE
+	bool
+	prompt "LXC 6 (lxc6-pv)"
+	help
+	  The default, as in meta-pantavisor (lxc-stable). Pantavisor
+	  picks the cgroup version itself (PV_SYSTEM_CGROUP_VERSION=auto):
+	  cgroup v2 when the kernel has cgroup BPF, v1 otherwise.
+
+config PANTAVISOR_LXC_DEPRECATED
+	bool
+	prompt "LXC 3 (lxc-pv, deprecated)"
+	help
+	  The old LXC 3.0 fork (meta-pantavisor's lxc-deprecated). It
+	  only supports cgroup v1, so Pantavisor is set to
+	  PV_SYSTEM_CGROUP_VERSION=1.
+
+endchoice
 
 config PANTAVISOR_DEBUG
 	bool
