@@ -1,3 +1,5 @@
 # from meta-pantavisor recipes-pv/libevent/files
 undef_ssl_renegotiation.patch
 evhttp-null-guard-freed-conn.patch
+# the do_configure:prepend sed in meta-pantavisor's libevent_2.2.1.bb
+pkg-config-drop-cmake-debug-postfix.patch
