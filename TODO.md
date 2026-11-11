@@ -16,7 +16,7 @@ Patches are based on PTXdist `master`, not on a release.
 | dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | PTXdist patch to write |
 | busybox | Stock 1.38.0 + 5 Pantavisor patches | PTXdist patch to write |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
-| lxc | Still `lxc-pv` | Bump ready in `upstream/ptxdist/`; 15 of 41 fork commits ready |
+| lxc | Still `lxc-pv` (LXC 3 fork, `06b49c1d`) | Bump ready in `upstream/ptxdist/`; 15 of 44 fork commits ready; see the LXC 6 question in section 7 |
 | libevent | Still `libevent-pv` 2.2.1-alpha | Blocked |
 | picohttpparser, libthttp, pantavisor | Layer packages | The RFC itself |
 
@@ -65,7 +65,7 @@ least reviewed. Where that is possible, send them there first:
       netlink and MODALIAS fixes. Send them to the busybox list;
       `FOLLOW_X_ROOT` is more Pantavisor-specific.
 - [ ] **Pantavisor** (Pantacor's repo, easy):
-  - [ ] Merge `patches/pantavisor-030/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch`.
+  - [ ] Merge `patches/pantavisor-031-rc8/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch`.
   - [ ] Drop `#include <lxc/pv_export.h>` from `plugins/pv_lxc.c`.
         Nothing uses it, and it is the only reason lxc would need to
         install that header.
@@ -90,6 +90,15 @@ under Pantavisor.
       (4096 -> 32768) for every user; it could be smaller, or configurable.
 - [ ] Squash `0003`, `0005` and `0006` (init.cmd parsing) into one patch,
       if the authors agree to a co-authored commit.
+
+### New on the fork, not yet sorted
+
+The fork gained three commits since the series was sorted:
+
+- [ ] `fd977239` conf: match pivot_root mount propagation in lxc_chroot.
+      Looks like a fix (B).
+- [ ] `99390fd9` and `06b49c1d`: the `lxc.tty.min` key and its fix. A new
+      key, off unless set, so it fits C. Squash the two.
 
 ### Still to do (D): behaviour changes for every lxc user
 
@@ -132,12 +141,17 @@ Pantavisor needs libevent 2.2's mbed TLS bufferevent backend. PTXdist has
   - wait for a 2.2 stable release and bump PTXdist's libevent;
   - backport the mbed TLS backend onto 2.1.13 as a patch (large);
   - move Pantavisor's libevent TLS to OpenSSL, which 2.1 supports.
-- [ ] Send the two libevent patches to libevent upstream.
+- [ ] Send the libevent patches to libevent upstream. The third one (the
+      `@CMAKE_DEBUG_POSTFIX@` in the autotools `.pc` files): check first
+      whether libevent master has fixed it.
 
 ## 5. The RFC series: new packages
 
 - [ ] **picohttpparser**: no dependencies.
-- [ ] **libthttp**: depends on mbedtls.
+- [ ] **libthttp**: depends on mbedtls. It downloads NSS `certdata.txt`
+      as a second part to install only `LIBTHTTP_CA_CERTS`; upstream may
+      prefer an option in PTXdist's ca-certificates package to install
+      chosen roots to a given directory.
 - [ ] **pantavisor**: depends on everything above. Review the menu
       (`rules/pantavisor.in`, `pantavisor-menu.in`) against PTXdist
       conventions: help text on every non-obvious option, no options that
@@ -169,6 +183,11 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
 
 ## 7. Open questions for the cover letter
 
+- meta-pantavisor made LXC 6 (`lxc6-pv`) its default in `a7f70d56` and
+  moved the LXC 3 fork to an `lxc-deprecated` feature. This layer still
+  builds LXC 3. Moving to LXC 6 here first would replace most of section 3
+  (and the EOL question below) with a different patch set against a
+  maintained LXC.
 - Carrying 15+ patches against lxc 3.0 (EOL). Acceptable, or must
   Pantavisor move to a maintained lxc first?
 - libevent 2.2-alpha, or one of the alternatives in section 4.
