@@ -9,3 +9,4 @@
 0302-mdev-support-FOLLOW_X_ROOT-and-MDEV_CONF.patch
 0303-fix-create_and_bind_to_netlink-setting-sa.nl_pid-to-.patch
 0304-Improve-mdev-MODALIAS-support-loading-pci-bus-driver.patch
+0305-mdev-don-t-match-name-rules-for-modalias-only-device.patch

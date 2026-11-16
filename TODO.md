@@ -31,15 +31,11 @@ Patches are based on PTXdist `master`, not on a release.
       `rules/dropbear.{in,make,postinst}` and PTXdist's. The postinst guard
       matches openssh's. Without it, enabling dropbear selects INITMETHOD,
       whose default is systemd.
-- [ ] **busybox: fix the `mdev -s` crash first.** `0304` (MODALIAS) segfaults
-      on any PCI device without `DEVNAME` as soon as `mdev.conf` has a
-      device-name rule: `make_device()` passes a NULL `device_name` to
-      `regexec()`. The `FOLLOW_X_ROOT` daemon dies the same way in its initial
-      scan, and `drivers.c` runs `mdev -s`. Seen on qemu-arm64 and natively;
-      the series before the squash has it too. Just `continue` on NULL is not
-      enough: it loops forever on the default rule, so the fix must also
-      end the rule loop there.
-- [ ] **busybox: add the Pantavisor patches.** Add 0300-0304 to
+- [x] **busybox: fix the `mdev -s` crash first.** `0304` (MODALIAS) passed
+      a NULL device name to `regexec()` for PCI devices without `DEVNAME`
+      as soon as `mdev.conf` had a device-name rule. `0305` skips name
+      rules for those devices; tested natively and on qemu-arm64.
+- [ ] **busybox: add the Pantavisor patches.** Add 0300-0305 to
       PTXdist's `patches/busybox-1.38.0/series`, and put
       `FEATURE_MDEV_FOLLOW_X_ROOT` into `config/busybox/util-linux/Config.in`.
       That lets `rules/busybox-pantavisor.in` go away (a layer can only
