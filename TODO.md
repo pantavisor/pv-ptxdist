@@ -43,10 +43,14 @@ Patches are based on PTXdist `master`, not on a release.
       Clean them up first: `0300` turns nsenter's `-F` into `F::`, so it
       takes an optional argument, and the series leaves unused variables
       (`securebits`, `m`, `ret` in nsenter, `subsys`, `res` in mdev).
-- [ ] **lxc: version bump 3.0.1 -> 6.0.6.** A rewrite of PTXdist's rule
-      to meson; `rules/lxc6-pv.make` has the pinned option list to start
-      from. Fixes `LXC_LICENSE := unknown` too. The 3.0.4 bump in
-      `upstream/ptxdist/` is obsolete with the move to LXC 6.
+- [x] **lxc: version bump 3.0.1 -> 6.0.6.** Written on PTXdist master
+      (4da61501e): `upstream/ptxdist/0001-lxc-version-bump-3.0.1-6.0.6.patch`.
+      Meson, every option pinned (`configure_helper.py` shows no
+      difference), license set. Cross-built and target-installed with
+      `LXC_TEST_TOOLS` on v8a; `lint` and `licensecheck` pass. Stock 6.0.6
+      needs no gold patch: meson falls back when the linker has no gold.
+      Not built: `LXC_SYSTEMD_UNIT` (needs `INITMETHOD_SYSTEMD`). Not run
+      on a target.
 - [ ] Before sending each one, rebase it on current PTXdist master and run
       `ptxdist lint` and `ptxdist licensecheck <pkg>`.
 
@@ -117,22 +121,66 @@ include, section 2) and `c2017d42` (rebase notes).
       Pantavisor uses: `origin=mkdir`, configoverlay, `/exports`, the
       `mdev` hook, `lxc.tty.min`, cgroup v1 (`PV_SYSTEM_CGROUP_VERSION=1`)
       as well as v2.
-- [ ] Drop `upstream/ptxdist/` (the LXC 3 series) once the LXC 6 series
-      replaces it, and `lxc-pv` once nobody needs the deprecated choice.
+- [x] Drop the LXC 3 series from `upstream/ptxdist/`.
+- [ ] Drop `lxc-pv` once nobody needs the deprecated choice.
 
-## 4. libevent (blocker)
+## 4. libevent: the case for 2.2
 
-Pantavisor needs libevent 2.2's mbed TLS bufferevent backend. PTXdist has
-2.1.13, and 2.2.1 is an alpha. `libevent-pv` also carries two patches
-(`undef_ssl_renegotiation`, `evhttp-null-guard-freed-conn`).
+The RFC proposes what meta-pantavisor does: libevent 2.2 replaces 2.1
+for the whole image (its recipe is `libevent_2.2.1.bb`, which overrides
+OE-core's), built with mbed TLS. In PTXdist that means a version bump of
+the `libevent` package, not a second libevent package: both would
+install the same headers.
 
-- [ ] Pick a way forward and ask about it in the RFC:
-  - wait for a 2.2 stable release and bump PTXdist's libevent;
-  - backport the mbed TLS backend onto 2.1.13 as a patch (large);
-  - move Pantavisor's libevent TLS to OpenSSL, which 2.1 supports.
-- [ ] Send the libevent patches to libevent upstream. The third one (the
-      `@CMAKE_DEBUG_POSTFIX@` in the autotools `.pc` files): check first
-      whether libevent master has fixed it.
+Why 2.2:
+
+- Pantavisor talks to Pantahub over HTTPS through evhttp on an mbed TLS
+  bufferevent (`bufferevent_mbedtls_dyncontext_new()`, `libevent_mbedtls`).
+  That backend exists only in 2.2; 2.1 has OpenSSL only. Everything else
+  Pantavisor uses (evhttp client and server) is in 2.1 too.
+- mbed TLS rather than OpenSSL: presumably for size, as Pantavisor runs
+  from the initramfs. Confirm with the Pantavisor team before writing it
+  in the cover letter.
+- 2.2 is what Pantavisor devices run: every meta-pantavisor build uses
+  it, with the patches below.
+
+What upstream will object to, and the answers:
+
+- **"It is an alpha."** 2.2 is the development series libevent releases
+  from: 2.2.1-alpha (2023-05), 2.2.2-alpha (2026-07), master active (11
+  commits after 2.2.2-alpha). There is no 2.2 stable to wait for, and 2.1
+  gets no new features. 2.2.2-alpha adds mbed TLS 3 and 4 support
+  (`7cfffeaa`), which the mbed TLS 2.28 EOL question needs anyway.
+- **"It changes libevent for everyone."** The soname changes
+  (`libevent-2.1.so.7` -> `libevent-2.2.so.1`), so the 7 packages that
+  select `LIBEVENT` rebuild: json-dbus-bridge, libcamera, lldpd,
+  libwebsockets, ntp, nfsutils, tmux. The 2.1 API is kept. Build all 7
+  against it before sending and list the result in the patch.
+- **"Patches on an alpha."** Each one is small and goes to libevent
+  first (below).
+
+To do:
+
+- [ ] Write the PTXdist patch: `libevent` 2.1.13 -> 2.2.2-alpha, with a
+      `LIBEVENT_MBEDTLS` option next to `LIBEVENT_OPENSSL`. Propose
+      2.2.2-alpha, not meta's 2.2.1-alpha: all three patches apply to it
+      unchanged.
+- [ ] Build the 7 consumers against it.
+- [ ] Move `libevent-pv` (and meta-pantavisor) to 2.2.2-alpha too, so
+      the RFC proposes what devices run.
+- [ ] Send the patches to libevent:
+  - [ ] `evhttp-null-guard-freed-conn`: a crash fix for evhttp on TLS
+        bufferevents. Has a placeholder author (`Pantacor
+        <dev@pantacor.com>`); find the real one.
+  - [ ] `pkg-config-drop-cmake-debug-postfix`: master's `.pc.in` files
+        still have `@CMAKE_DEBUG_POSTFIX@` (checked at d82464a2).
+  - [ ] `undef_ssl_renegotiation`: turns off renegotiation in the mbed TLS
+        bufferevent. Libevent's own `370d9924` only touches the tests.
+        Author is `OpenEmbedded <oe.patch@oe>`; find the real one and the
+        reason, or drop it if it is not needed with mbed TLS 3.
+- [ ] meta-pantavisor sets `ac_cv_func_epoll_pwait2=no` for kernels older
+      than 5.11 (Jetson Nano 4.9). `libevent-pv` does not: decide whether
+      the PTXdist rule needs it.
 
 ## 5. The RFC series: new packages
 
@@ -174,7 +222,7 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
 
 - Carrying Pantavisor's LXC 6 patches (section 3) that lxc upstream does
   not take: acceptable in PTXdist, or must they all land in lxc first?
-- libevent 2.2-alpha, or one of the alternatives in section 4.
+- libevent 2.2 for everyone, as meta-pantavisor does (section 4).
 - The dropbear `-n` patch, if dropbear upstream does not take it.
 - A `pantavisor` init choice: Pantavisor is PID 1, so it could be an
   `INITMETHOD` choice, or a standalone initramfs package.
