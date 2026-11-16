@@ -14,8 +14,8 @@ PACKAGES-$(PTXCONF_PANTAVISOR) += pantavisor
 #
 # Paths and names
 #
-PANTAVISOR_VERSION	:= 031-rc8
-PANTAVISOR_SHA256	:= 7cc499dbba8d2e76ac9067a813731afe2f4cd7eb924d24a6cfeee202ef3cf292
+PANTAVISOR_VERSION	:= 031-rc12
+PANTAVISOR_SHA256	:= 183e639ba8b8a4117578490bd68e52acaf37b30163eaf257504455e310d283be
 PANTAVISOR		:= pantavisor-$(PANTAVISOR_VERSION)
 PANTAVISOR_SUFFIX	:= tar.gz
 PANTAVISOR_URL		:= https://github.com/pantavisor/pantavisor.git;tag=$(PANTAVISOR_VERSION)
@@ -49,7 +49,7 @@ PANTAVISOR_CONF_OPT	:= \
 	-DPANTAVISOR_DISTRO_NAME=ptxdist \
 	-DPANTAVISOR_DISTRO_VERSION=$(PTXDIST_VERSION_FULL)
 
-# Consumed by gen_version.sh (see patches/pantavisor-031-rc8).
+# Consumed by gen_version.sh (see patches/pantavisor-031-rc12).
 PANTAVISOR_MAKE_ENV	:= \
 	PV_GIT_DESCRIBE=$(PANTAVISOR_VERSION)
 
