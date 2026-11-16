@@ -1,21 +1,25 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alexander Sack <asac@pantacor.com>
 Date: Mon, 1 Nov 2021 13:01:10 +0100
-Subject: [PATCH] nsenter: add --caps to adopt the target's capabilities
+Subject: [PATCH 300/305] nsenter: add --caps to adopt the target's
+ capabilities
 
 With --target, read the target process' capabilities before switching
 namespaces and drop from the bounding set whatever it does not hold.
 
 [fernando: squashed "add --caps flag to make nsenter also adopt the same
  caps that the target process holds" and "fix capget to be run before
- switching namespaces"]
+ switching namespaces". Keep -F a flag (the series had made it take
+ an optional argument), document -c, build capability.c for nsenter
+ alone, and drop the unused and commented-out securebits code.]
 (cherry picked from commit 0166864efe7903b57cec70744ea3f0dd551b7208)
 (cherry picked from commit c18302ac03f3476cab3df94b3d4467fff63db025)
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  include/libbb.h      |  2 +-
- util-linux/nsenter.c | 80 ++++++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 79 insertions(+), 3 deletions(-)
+ libbb/capability.c   |  1 +
+ util-linux/nsenter.c | 68 ++++++++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 68 insertions(+), 3 deletions(-)
 
 diff --git a/include/libbb.h b/include/libbb.h
 index 37f9da5..82aa043 100644
@@ -30,11 +34,31 @@ index 37f9da5..82aa043 100644
  unsigned cap_name_to_number(const char *cap) FAST_FUNC;
  void printf_cap(const char *pfx, unsigned cap_no) FAST_FUNC;
  void drop_capability(int cap_ordinal) FAST_FUNC;
+diff --git a/libbb/capability.c b/libbb/capability.c
+index e3c252a..397fc38 100644
+--- a/libbb/capability.c
++++ b/libbb/capability.c
+@@ -5,6 +5,7 @@
+  */
+ //kbuild:lib-$(CONFIG_FEATURE_SETPRIV_CAPABILITIES) += capability.o
+ //kbuild:lib-$(CONFIG_RUN_INIT) += capability.o
++//kbuild:lib-$(CONFIG_NSENTER) += capability.o
+ 
+ #include <linux/capability.h>
+ // #include <sys/capability.h>
 diff --git a/util-linux/nsenter.c b/util-linux/nsenter.c
-index 425d517..c857fc5 100644
+index 425d517..42eae19 100644
 --- a/util-linux/nsenter.c
 +++ b/util-linux/nsenter.c
-@@ -54,6 +54,22 @@
+@@ -34,6 +34,7 @@
+ //usage:     "\n	-r[DIR]		Set root directory"
+ //usage:     "\n	-w[DIR]		Set working directory"
+ //usage:     "\n	-F		Don't fork before exec'ing PROG"
++//usage:     "\n	-c		With -t, drop the capabilities PID does not hold"
+ 
+ #include <sched.h>
+ #ifndef CLONE_NEWUTS
+@@ -54,6 +55,22 @@
  
  #include "libbb.h"
  
@@ -57,7 +81,7 @@ index 425d517..c857fc5 100644
  struct namespace_descr {
  	int flag;		/* value passed to setns() */
  	char ns_nsfile8[8];	/* "ns/" + namespace file in process' procfs entry */
-@@ -77,7 +93,8 @@ enum {
+@@ -77,7 +94,8 @@ enum {
  	OPT_root	= 1 << 9,
  	OPT_wd		= 1 << 10,
  	OPT_nofork	= 1 << 11,
@@ -67,16 +91,16 @@ index 425d517..c857fc5 100644
  };
  enum {
  	NS_USR_POS = 0,
-@@ -105,7 +122,7 @@ static const struct namespace_descr ns_list[] ALIGN_INT = {
+@@ -105,7 +123,7 @@ static const struct namespace_descr ns_list[] ALIGN_INT = {
   * Upstream nsenter doesn't support the short option for --preserve-credentials
   * "+": stop on first non-option
   */
 -static const char opt_str[] ALIGN1 = "+""U::i::u::n::p::m::""t:+S:+G:+r::w::F";
-+static const char opt_str[] ALIGN1 = "+""U::i::u::n::p::m::""t:+S:+G:+r::w::F::c";
++static const char opt_str[] ALIGN1 = "+""U::i::u::n::p::m::""t:+S:+G:+r::w::Fc";
  
  #if ENABLE_LONG_OPTS
  static const char nsenter_longopts[] ALIGN1 =
-@@ -121,6 +138,7 @@ static const char nsenter_longopts[] ALIGN1 =
+@@ -121,6 +139,7 @@ static const char nsenter_longopts[] ALIGN1 =
  	"root\0"			Optional_argument	"r"
  	"wd\0"				Optional_argument	"w"
  	"no-fork\0"			No_argument		"F"
@@ -84,18 +108,15 @@ index 425d517..c857fc5 100644
  	"preserve-credentials\0"	No_argument		"\xff"
  	;
  #endif
-@@ -164,6 +182,10 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
+@@ -164,6 +183,7 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
  	int target_pid = 0;
  	int uid = 0;
  	int gid = 0;
 +	struct caps capst;
-+	unsigned securebits;
-+	__u32 bounds;
-+	int cap = 0;
  
  	memset(ns_ctx_list, 0, sizeof(ns_ctx_list));
  
-@@ -196,6 +218,19 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
+@@ -196,6 +216,18 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
  					target_pid, ns->ns_nsfile8);
  	}
  
@@ -103,7 +124,6 @@ index 425d517..c857fc5 100644
 +	 * Lets gather caps info from target pid before switching NS if --caps is used
 +	 */
 +	if ((opts & OPT_cap) && (opts & OPT_target)) {
-+		int ret;
 +		getcaps(&capst);
 +
 +		capst.header.pid = target_pid;
@@ -115,7 +135,7 @@ index 425d517..c857fc5 100644
  	/*
  	 * Entering the user namespace without --preserve-credentials implies
  	 * --setuid & --setgid and clearing root's groups.
-@@ -262,6 +297,47 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
+@@ -262,6 +294,38 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
  		/* Child continues */
  	}
  
@@ -123,13 +143,11 @@ index 425d517..c857fc5 100644
 +	 * Entering the namespace with caps matching the target
 +	 */
 +	if ((opts & OPT_cap) && (opts & OPT_target)) {
++		__u32 bounds;
++		int cap = 0;
 +		int ret;
 +
-+		/* XXX: fix securebits
-+		securebits = prctl(PR_GET_SECUREBITS);
-+		securebits |= SECBIT_NOROOT;
-+		*/
-+
++		/* Securebits are left as they are, not copied from PID */
 +		while ((ret = prctl(PR_CAPBSET_READ, cap)) >= 0) {
 +			// if we dont have a cap in bounding set, we don't
 +			// need to think about
@@ -139,10 +157,9 @@ index 425d517..c857fc5 100644
 +
 +			// new bounds will be effective | permitted | inheritable of the target pid
 +			bounds = capst.data[CAP_TO_INDEX(cap)].effective
-+				| capst.data[CAP_TO_INDEX(cap)].permitted \
++				| capst.data[CAP_TO_INDEX(cap)].permitted
 +				| capst.data[CAP_TO_INDEX(cap)].inheritable;
 +
-+			__u32 m = CAP_TO_MASK(cap);
 +			if ((bounds & CAP_TO_MASK(cap)) == CAP_TO_MASK(cap))
 +				goto next;
 +
@@ -152,12 +169,6 @@ index 425d517..c857fc5 100644
 +		next:
 +			cap++;
 +		}
-+
-+		/* XXX: need to fix securebits to adjust to whatever --target has ...
-+		// set any securebits we have determined
-+		if (prctl(PR_SET_SECUREBITS, securebits))
-+			bb_simple_perror_msg_and_die("securebits");
-+		*/
 +	}
 +
  	if (opts & OPT_setgid) {

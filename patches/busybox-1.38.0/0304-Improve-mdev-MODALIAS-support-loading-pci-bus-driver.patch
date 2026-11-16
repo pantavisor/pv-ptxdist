@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alexander Sack <asac@pantacor.com>
 Date: Wed, 22 Feb 2023 16:47:04 +0100
-Subject: [PATCH] Improve mdev MODALIAS; support loading pci bus drivers during
- -s (scan)
+Subject: [PATCH 304/305] Improve mdev MODALIAS; support loading pci bus
+ drivers during -s (scan)
 
  * make scan do recursive_action on /sys/bus/pci/devices that have /modalias
  * ensure MODALIAS env is set from /uevent
@@ -11,13 +11,15 @@ Subject: [PATCH] Improve mdev MODALIAS; support loading pci bus drivers during
    to follow links only for level 0 and 1
  * introduce OP_modalias to make_device function
 
+[fernando: drop unused variables and an always-false size_t < 0 check
+ from fileActionModalias()]
 (cherry picked from commit 758b22439ecddb345253198433778972f86b9a25)
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  include/libbb.h          |  7 ++--
  libbb/recursive_action.c |  4 +-
- util-linux/mdev.c        | 90 ++++++++++++++++++++++++++++++++++------
- 3 files changed, 84 insertions(+), 17 deletions(-)
+ util-linux/mdev.c        | 83 +++++++++++++++++++++++++++++++++++-----
+ 3 files changed, 80 insertions(+), 14 deletions(-)
 
 diff --git a/include/libbb.h b/include/libbb.h
 index 82aa043..82e52f3 100644
@@ -53,7 +55,7 @@ index b1c4bfa..13fbf3e 100644
  	status = (follow ? stat : lstat)(fileName, &statbuf);
  	if (status < 0) {
 diff --git a/util-linux/mdev.c b/util-linux/mdev.c
-index 11a5f77..92326cc 100644
+index f8892e9..4178bcc 100644
 --- a/util-linux/mdev.c
 +++ b/util-linux/mdev.c
 @@ -285,7 +285,7 @@
@@ -86,28 +88,17 @@ index 11a5f77..92326cc 100644
  
  #if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
  static char *newroot = NULL;
-@@ -584,9 +588,9 @@ static char *build_alias(char *alias, const char *device_name)
+@@ -584,7 +588,8 @@ static char *build_alias(char *alias, const char *device_name)
  static void make_device(char *device_name, char *path, int operation)
  {
  	int major, minor, type, len;
 -	char *path_end = path + strlen(path);
 +	int path_len = strlen(path);
 +	char *path_end = path + path_len;
- 	struct stat s;
--	static char wd [PATH_MAX] = {0};
- 
  #if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
- 	if (newrootdev && !(!access(newrootdev, X_OK) && !stat(newrootdev, &s) && (S_IFDIR & s.st_mode))){
-@@ -603,8 +607,6 @@ static void make_device(char *device_name, char *path, int operation)
- #endif
- 		chdir ("/dev");
+ 	struct stat st;
  
--	getcwd(wd, PATH_MAX);
--
- 	/* Try to read major/minor string.  Note that the kernel puts \n after
- 	 * the data, so we don't need to worry about null terminating the string
- 	 * because sscanf() will stop at the first nondigit, which \n is.
-@@ -613,7 +615,8 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -607,7 +612,8 @@ static void make_device(char *device_name, char *path, int operation)
  	major = -1;
  	if (operation == OP_add) {
  		strcpy(path_end, "/dev");
@@ -117,7 +108,7 @@ index 11a5f77..92326cc 100644
  		*path_end = '\0';
  		if (len < 1) {
  			if (!ENABLE_FEATURE_MDEV_EXEC)
-@@ -630,6 +633,8 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -624,6 +630,8 @@ static void make_device(char *device_name, char *path, int operation)
  
  	/* Determine device name */
  	if (!device_name) {
@@ -126,7 +117,7 @@ index 11a5f77..92326cc 100644
  		/*
  		 * There was no $DEVNAME envvar (for example, mdev -s never has).
  		 * But it is very useful: it contains the *path*, not only basename,
-@@ -640,20 +645,38 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -634,20 +642,38 @@ static void make_device(char *device_name, char *path, int operation)
  		 * DEVNAME=snd/controlC0
  		 */
  		strcpy(path_end, "/uevent");
@@ -168,7 +159,7 @@ index 11a5f77..92326cc 100644
  	/* Determine device type */
  	/*
  	 * http://kernel.org/doc/pending/hotplug.txt says that only
-@@ -692,6 +715,7 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -686,6 +712,7 @@ static void make_device(char *device_name, char *path, int operation)
  			memset(off, 0, sizeof(off));
  			goto rule_matches;
  		}
@@ -176,7 +167,7 @@ index 11a5f77..92326cc 100644
  		if (rule->envvar) { /* $envvar=regex rule */
  			str_to_match = getenv(rule->envvar);
  			dbg3("getenv('%s'):'%s'", rule->envvar, str_to_match);
-@@ -725,7 +749,7 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -719,7 +746,7 @@ static void make_device(char *device_name, char *path, int operation)
  #endif
  		/* Build alias name */
  		alias = NULL;
@@ -185,7 +176,7 @@ index 11a5f77..92326cc 100644
  			aliaslink = rule->ren_mov[0];
  			if (aliaslink == '!') {
  				/* "!": suppress node creation/deletion */
-@@ -786,7 +810,7 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -780,7 +807,7 @@ static void make_device(char *device_name, char *path, int operation)
  
  		/* "Execute" the line we found */
  		node_name = device_name;
@@ -194,7 +185,7 @@ index 11a5f77..92326cc 100644
  			node_name = alias = build_alias(alias, device_name);
  			dbg3("alias2:'%s'", alias);
  		}
-@@ -849,7 +873,7 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -843,7 +870,7 @@ static void make_device(char *device_name, char *path, int operation)
  			unlink(node_name);
  		}
  
@@ -203,7 +194,7 @@ index 11a5f77..92326cc 100644
  			free(alias);
  
  		/* We found matching line.
-@@ -914,6 +938,32 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
+@@ -908,6 +935,28 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
  	return TRUE;
  }
  
@@ -216,11 +207,7 @@ index 11a5f77..92326cc 100644
 +{
 +	size_t len = strlen(fileName) - 9; /* can't underflow */
 +	char *path = state->userData;	/* char array[PATH_MAX + SCRATCH_SIZE] */
-+	char subsys[PATH_MAX];
-+	int res;
 +
-+	if (len < 0)
-+		return FALSE;
 +	/* Is it a ".../dev" file? (len check is for paranoid reasons) */
 +	if (strcmp(fileName + len, "/modalias") != 0 || len >= PATH_MAX - 32)
 +		return FALSE; /* not .../dev */
@@ -236,7 +223,7 @@ index 11a5f77..92326cc 100644
  /* Directory callback for /sys/ traversal */
  static int FAST_FUNC dirAction(struct recursive_state *state,
  		const char *fileName UNUSED_PARAM,
-@@ -922,6 +972,14 @@ static int FAST_FUNC dirAction(struct recursive_state *state,
+@@ -916,6 +965,14 @@ static int FAST_FUNC dirAction(struct recursive_state *state,
  	return (state->depth >= MAX_SYSFS_DEPTH ? SKIP : TRUE);
  }
  
@@ -251,7 +238,7 @@ index 11a5f77..92326cc 100644
  /* For the full gory details, see linux/Documentation/firmware_class/README
   *
   * Firmware loading works like this:
-@@ -1178,6 +1236,12 @@ static void initial_scan(char *temp)
+@@ -1172,6 +1229,12 @@ static void initial_scan(char *temp)
  
  	putenv((char*)"ACTION=add");
  

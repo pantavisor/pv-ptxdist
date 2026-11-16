@@ -40,9 +40,10 @@ Patches are based on PTXdist `master`, not on a release.
       `FEATURE_MDEV_FOLLOW_X_ROOT` into `config/busybox/util-linux/Config.in`.
       That lets `rules/busybox-pantavisor.in` go away (a layer can only
       override all of `config/busybox`, so it lives there for now).
-      Clean them up first: `0300` turns nsenter's `-F` into `F::`, so it
-      takes an optional argument, and the series leaves unused variables
-      (`securebits`, `m`, `ret` in nsenter, `subsys`, `res` in mdev).
+      The series is cleaned up: `-F` is a flag again, `-c` is documented,
+      nsenter links without setpriv/run-init, `chdir()`/`chroot()` are
+      checked when following the root, and nsenter.c and mdev.c build with
+      no warnings beyond stock 1.38.0's. Every patch builds on its own.
 - [x] **lxc: version bump 3.0.1 -> 6.0.6.** Written on PTXdist master
       (4da61501e): `upstream/ptxdist/0001-lxc-version-bump-3.0.1-6.0.6.patch`.
       Meson, every option pinned (`configure_helper.py` shows no

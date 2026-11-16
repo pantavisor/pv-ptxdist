@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alexander Sack <asac@pantacor.com>
 Date: Mon, 23 May 2022 23:49:29 +0200
-Subject: [PATCH] mdev: support FOLLOW_X_ROOT and MDEV_CONF
+Subject: [PATCH 302/305] mdev: support FOLLOW_X_ROOT and MDEV_CONF
 
 Let an mdev daemon work on the /dev of a root that is being prepared in
 a mount namespace and keep working after its pivot or switch root:
@@ -14,18 +14,20 @@ chroot away from it later.
  depends in mdev.c for FOLLOW_X_ROOT config" and "add FOLLOW_X_PID
  support for pantavisor mdev". ROOTFSDIR did not survive the series, and
  FOLLOW_X_PID is left out: nothing uses it and it passed the string to
- a %d, so it could not find the process.]
+ a %d, so it could not find the process. Check chdir() and chroot()
+ when following the root, keep make_device() unchanged without
+ FOLLOW_X_ROOT, and drop an unused getcwd() buffer.]
 (cherry picked from commit 2e99cb323f017bd88128cc0e21b07a9c720cae31)
 (cherry picked from commit f12cd7033f7f563e342a038f5e451be5976ced42)
 (cherry picked from commit fb3b7e1353d126be78cd6f4c329a3018db5161d0)
 (cherry picked from commit 838b5e51f408d1c68ce52734de6b5f09e5e3da13)
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
- util-linux/mdev.c | 77 ++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 66 insertions(+), 11 deletions(-)
+ util-linux/mdev.c | 71 +++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 60 insertions(+), 11 deletions(-)
 
 diff --git a/util-linux/mdev.c b/util-linux/mdev.c
-index e98d467..11a5f77 100644
+index e98d467..f8892e9 100644
 --- a/util-linux/mdev.c
 +++ b/util-linux/mdev.c
 @@ -74,6 +74,17 @@
@@ -80,33 +82,27 @@ index e98d467..11a5f77 100644
  	if (G.rule_vec) {
  		/* mdev -s */
  		/* Do we have rule parsed already? */
-@@ -575,6 +585,25 @@ static void make_device(char *device_name, char *path, int operation)
+@@ -575,6 +585,19 @@ static void make_device(char *device_name, char *path, int operation)
  {
  	int major, minor, type, len;
  	char *path_end = path + strlen(path);
-+	struct stat s;
-+	static char wd [PATH_MAX] = {0};
-+
 +#if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
-+	if (newrootdev && !(!access(newrootdev, X_OK) && !stat(newrootdev, &s) && (S_IFDIR & s.st_mode))){
++	struct stat st;
++
++	if (newrootdev && !(!access(newrootdev, X_OK) && !stat(newrootdev, &st) && S_ISDIR(st.st_mode))) {
 +		dbg1("following x root...");
-+		newrootdev=NULL;
-+		chdir("/");
-+		chdir("..");
-+		chroot(".");
++		newrootdev = NULL;
++		xchdir("/");
++		xchdir("..");
++		xchroot(".");
 +	}
 +
-+	if (newrootdev)
-+		chdir(newrootdev);
-+	else
++	xchdir(newrootdev ? newrootdev : "/dev");
 +#endif
-+		chdir ("/dev");
-+
-+	getcwd(wd, PATH_MAX);
  
  	/* Try to read major/minor string.  Note that the kernel puts \n after
  	 * the data, so we don't need to worry about null terminating the string
-@@ -953,7 +982,13 @@ static void load_firmware(const char *firmware, const char *sysfs_path)
+@@ -953,7 +976,13 @@ static void load_firmware(const char *firmware, const char *sysfs_path)
  		full_write(loading_fd, "-1", 2);
  
   out:
@@ -121,7 +117,7 @@ index e98d467..11a5f77 100644
  	if (ENABLE_FEATURE_CLEAN_UP) {
  		close(firmware_fd);
  		close(loading_fd);
-@@ -1256,20 +1291,40 @@ int mdev_main(int argc UNUSED_PARAM, char **argv)
+@@ -1256,20 +1285,40 @@ int mdev_main(int argc UNUSED_PARAM, char **argv)
  	/* Force the configuration file settings exactly */
  	umask(0);
  
