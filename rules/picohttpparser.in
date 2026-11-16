@@ -5,5 +5,5 @@ config PICOHTTPPARSER
 	prompt "picohttpparser"
 	select HOST_CMAKE
 	help
-	  Tiny HTTP request/response parser (Pantacor fork). Built as a
-	  static library only, so nothing is installed on the target.
+	  Tiny HTTP request/response parser, used by Pantavisor. Built as
+	  a static library only, so nothing is installed on the target.

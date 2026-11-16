@@ -14,12 +14,12 @@ PACKAGES-$(PTXCONF_LIBTHTTP) += libthttp
 #
 # Paths and names
 #
-# Pinned to the revision used by meta-pantavisor (011+git, branch master).
-LIBTHTTP_VERSION	:= ce916c562c5b11bcb0b5165043ded543dfea322a
-LIBTHTTP_SHA256		:= 5b2bf2981576c0582b9edd8339491d9af370b84f6fba67b97507257918bd29c1
+# The revision meta-pantavisor builds: 75 commits after the last tag (011).
+LIBTHTTP_VERSION	:= 011-75-gce916c562c5b
+LIBTHTTP_SHA256		:= 21442ec391208d09fd5a1b39d96cc51e8edfef746308f323cfb5e3c8ce9a3ecd
 LIBTHTTP		:= libthttp-$(LIBTHTTP_VERSION)
 LIBTHTTP_SUFFIX		:= tar.gz
-LIBTHTTP_URL		:= https://github.com/pantavisor/libthttp.git;tag=$(LIBTHTTP_VERSION)
+LIBTHTTP_URL		:= git+https://github.com/pantavisor/libthttp.git;tag=$(LIBTHTTP_VERSION)
 LIBTHTTP_SOURCE		:= $(SRCDIR)/$(LIBTHTTP).$(LIBTHTTP_SUFFIX)
 LIBTHTTP_DIR		:= $(BUILDDIR)/$(LIBTHTTP)
 LIBTHTTP_LICENSE	:= MIT AND MPL-2.0
@@ -41,6 +41,8 @@ LIBTHTTP_PARTS			+= LIBTHTTP_CERTDATA
 # Prepare
 # ----------------------------------------------------------------------------
 
+# Static library linked into Pantavisor's executables and its pv_lxc.so
+# plugin, hence PIC.
 LIBTHTTP_CONF_TOOL	:= cmake
 LIBTHTTP_CONF_OPT	:= \
 	$(CROSS_CMAKE_USR) \

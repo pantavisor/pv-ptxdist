@@ -185,18 +185,23 @@ To do:
 
 ## 5. The RFC series: new packages
 
-- [ ] **picohttpparser**: no dependencies.
+- [x] **picohttpparser**: upstream h2o/picohttpparser at 066d2b1 (what
+      the Pantavisor fork is based on) plus the fork's CMake build as a
+      patch; the fork has no other change.
 - [ ] **libthttp**: depends on mbedtls. It downloads NSS `certdata.txt`
       as a second part to install only `LIBTHTTP_CA_CERTS`; upstream may
       prefer an option in PTXdist's ca-certificates package to install
       chosen roots to a given directory.
-- [ ] **pantavisor**: depends on everything above. Review the menu
-      (`rules/pantavisor.in`, `pantavisor-menu.in`) against PTXdist
-      conventions: help text on every non-obvious option, no options that
-      only one board needs.
-- [ ] For each: pin all CMake options (PTXdist's `configure_helper.py`), set
-      `_LICENSE` and `_LICENSE_FILES`, remove leftover template stages, and
-      have `ptxdist lint` and `licensecheck` pass.
+- [x] **pantavisor**: menu reviewed. Every option has help text, nothing
+      is board-specific, the debug build is off by default (the layer's
+      ptxconfig keeps it on), and `PANTAVISOR_DEVELOPER_TRUST` makes the
+      developer trust store visible and optional.
+- [x] For each: every CMake option pinned (`configure_helper.py` shows
+      only `CMAKE_POSITION_INDEPENDENT_CODE`, kept on purpose, and
+      `find_library()` results), `_LICENSE` and `_LICENSE_FILES` set,
+      `git+https` URLs with PTXdist-style versions, `licensecheck` passes,
+      `lint` reports nothing for them.
+- [ ] Not built: `PANTAVISOR_DEVELOPER_TRUST` off.
 - [ ] Decide whether **pantavisor-rootfs** (the initramfs layout) folds into
       the `pantavisor` package, so that PTXdist alone gives a bootable
       Pantavisor initramfs.

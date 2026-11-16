@@ -14,12 +14,14 @@ PACKAGES-$(PTXCONF_PICOHTTPPARSER) += picohttpparser
 #
 # Paths and names
 #
-# Pinned to the revision used by meta-pantavisor (branch pv/master).
-PICOHTTPPARSER_VERSION	:= facd3dafae02558cddb751d9f64df03bb259d4d3
-PICOHTTPPARSER_SHA256	:= bc5298ff927c5c705f3fb0838f285746062fc8edfbfaa6ac772b47c7a40b207b
+# Upstream has no releases. The revision meta-pantavisor builds; its
+# github.com/pantavisor/picohttpparser fork adds only the CMake build
+# (patches/).
+PICOHTTPPARSER_VERSION	:= 2021-02-24-g066d2b1e9ab8
+PICOHTTPPARSER_SHA256	:= 63144ca669204315e62a7abc23a1f487375dc3fe4d9ebbd694a6706a09d9e535
 PICOHTTPPARSER		:= picohttpparser-$(PICOHTTPPARSER_VERSION)
 PICOHTTPPARSER_SUFFIX	:= tar.gz
-PICOHTTPPARSER_URL	:= https://github.com/pantavisor/picohttpparser.git;tag=$(PICOHTTPPARSER_VERSION)
+PICOHTTPPARSER_URL	:= git+https://github.com/h2o/picohttpparser.git;tag=$(PICOHTTPPARSER_VERSION)
 PICOHTTPPARSER_SOURCE	:= $(SRCDIR)/$(PICOHTTPPARSER).$(PICOHTTPPARSER_SUFFIX)
 PICOHTTPPARSER_DIR	:= $(BUILDDIR)/$(PICOHTTPPARSER)
 PICOHTTPPARSER_LICENSE	:= MIT OR Artistic-1.0-Perl
@@ -30,6 +32,8 @@ PICOHTTPPARSER_LICENSE_FILES := \
 # Prepare
 # ----------------------------------------------------------------------------
 
+# Static library linked into Pantavisor's executables and its pv_lxc.so
+# plugin, hence PIC.
 PICOHTTPPARSER_CONF_TOOL	:= cmake
 PICOHTTPPARSER_CONF_OPT		:= \
 	$(CROSS_CMAKE_USR) \
