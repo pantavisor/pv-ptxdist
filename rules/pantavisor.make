@@ -14,8 +14,8 @@ PACKAGES-$(PTXCONF_PANTAVISOR) += pantavisor
 #
 # Paths and names
 #
-PANTAVISOR_VERSION	:= 031-rc12
-PANTAVISOR_SHA256	:= 183e639ba8b8a4117578490bd68e52acaf37b30163eaf257504455e310d283be
+PANTAVISOR_VERSION	:= 031
+PANTAVISOR_SHA256	:= ec0785e36ca53931bc6dd0c8316ffbe43017ec0e4c85e53d5a437f87b97c53a6
 PANTAVISOR		:= pantavisor-$(PANTAVISOR_VERSION)
 PANTAVISOR_SUFFIX	:= tar.gz
 PANTAVISOR_URL		:= git+https://github.com/pantavisor/pantavisor.git;tag=$(PANTAVISOR_VERSION)
@@ -53,7 +53,7 @@ PANTAVISOR_CONF_OPT	:= \
 	-DPANTAVISOR_XCONNECT=$(call ptx/onoff, PTXCONF_PANTAVISOR_XCONNECT) \
 	-DPANTAVISOR_XCONNECT_DBUS_SYSTEMBUS=OFF
 
-# Consumed by gen_version.sh (see patches/pantavisor-031-rc12).
+# Consumed by gen_version.sh (see patches/pantavisor-031).
 PANTAVISOR_MAKE_ENV	:= \
 	PV_GIT_DESCRIBE=$(PANTAVISOR_VERSION)
 

@@ -67,7 +67,7 @@ least reviewed. Where that is possible, send them there first:
       netlink and MODALIAS fixes. Send them to the busybox list;
       `FOLLOW_X_ROOT` is more Pantavisor-specific.
 - [ ] **Pantavisor** (Pantacor's repo, easy):
-  - [ ] Merge `patches/pantavisor-031-rc12/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch`.
+  - [ ] Merge `patches/pantavisor-031/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch`.
   - [ ] Drop `#include <lxc/pv_export.h>` from `plugins/pv_lxc.c`.
         Nothing uses it, and it is the only reason lxc would need to
         install that header.

@@ -14,9 +14,9 @@ PACKAGES-$(PTXCONF_LIBTHTTP) += libthttp
 #
 # Paths and names
 #
-# The revision meta-pantavisor builds: 75 commits after the last tag (011).
-LIBTHTTP_VERSION	:= 011-75-gce916c562c5b
-LIBTHTTP_SHA256		:= 21442ec391208d09fd5a1b39d96cc51e8edfef746308f323cfb5e3c8ce9a3ecd
+# The revision meta-pantavisor builds: 76 commits after the last tag (011).
+LIBTHTTP_VERSION	:= 011-76-gff79603fc178
+LIBTHTTP_SHA256		:= 98452b92c86a211bbb4fe8790c04f344f3cf0274b816da58bd2d51e6fb745f4f
 LIBTHTTP		:= libthttp-$(LIBTHTTP_VERSION)
 LIBTHTTP_SUFFIX		:= tar.gz
 LIBTHTTP_URL		:= git+https://github.com/pantavisor/libthttp.git;tag=$(LIBTHTTP_VERSION)
