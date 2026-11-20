@@ -25,6 +25,8 @@ upstream DistroKit directly.
 | `configs/kernel-fragments/` | Kernel fragments, merged into the kernel delta with `scripts/merge-pv-kernel-fragments.sh` |
 | `configs/pantavisor/` | Device skel, `pantahub.config`, boot script sources |
 | `rules/`, `platforms/` | Pantavisor packages (including `host-pv-pvr-sdk`) and the `image-pv-*` image types |
+| `rules/dropbear.*`, `rules/mbedtls.make` | PTXdist 2026.10.0's own rules with changes meant for upstream PTXdist (`DROPBEAR_GENKEYS`, mbed TLS 2.28.10); remove them once PTXdist has the changes |
+| `patches/{busybox,dropbear,mbedtls}-*` | Pantavisor patches on PTXdist's stock busybox, dropbear and mbedtls |
 
 The v8a and x86_64 platforms carry the Pantavisor changes; the other
 DistroKit platforms build DistroKit's own images.

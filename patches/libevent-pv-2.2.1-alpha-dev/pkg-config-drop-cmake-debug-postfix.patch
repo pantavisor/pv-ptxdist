@@ -1,0 +1,82 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Wed, 11 Nov 2026 19:50:29 -0300
+Subject: [PATCH] pkg-config: drop the CMake debug postfix from the autotools
+ .pc files
+
+The 2.2.1-alpha .pc.in files carry CMake's @CMAKE_DEBUG_POSTFIX@, which
+autotools never substitutes, so pkg-config consumers link against
+-levent_core@CMAKE_DEBUG_POSTFIX@ and their configure link tests fail.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ libevent_core.pc.in     | 2 +-
+ libevent_extra.pc.in    | 2 +-
+ libevent_mbedtls.pc.in  | 2 +-
+ libevent_openssl.pc.in  | 2 +-
+ libevent_pthreads.pc.in | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/libevent_core.pc.in b/libevent_core.pc.in
+index eca8dab..5b56861 100644
+--- a/libevent_core.pc.in
++++ b/libevent_core.pc.in
+@@ -8,6 +8,6 @@ includedir=@includedir@
+ Name: libevent_core
+ Description: libevent_core
+ Version: @VERSION@
+-Libs: -L${libdir} -levent_core@CMAKE_DEBUG_POSTFIX@
++Libs: -L${libdir} -levent_core
+ Libs.private: @LIBS@
+ Cflags: -I${includedir}
+diff --git a/libevent_extra.pc.in b/libevent_extra.pc.in
+index 03deca7..fa9c5ab 100644
+--- a/libevent_extra.pc.in
++++ b/libevent_extra.pc.in
+@@ -9,6 +9,6 @@ Name: libevent_extra
+ Description: libevent_extra
+ Version: @VERSION@
+ Requires: libevent_core
+-Libs: -L${libdir} -levent_extra@CMAKE_DEBUG_POSTFIX@
++Libs: -L${libdir} -levent_extra
+ Libs.private: @LIBS@
+ Cflags: -I${includedir}
+diff --git a/libevent_mbedtls.pc.in b/libevent_mbedtls.pc.in
+index 89479a1..690ceb4 100644
+--- a/libevent_mbedtls.pc.in
++++ b/libevent_mbedtls.pc.in
+@@ -9,6 +9,6 @@ Name: libevent_mbedtls
+ Description: libevent_mbedtls adds mbedtls-based TLS support to libevent
+ Version: @VERSION@
+ Requires: libevent_core
+-Libs: -L${libdir} -levent_mbedtls@CMAKE_DEBUG_POSTFIX@
++Libs: -L${libdir} -levent_mbedtls
+ Libs.private: -lmbedtls -lmbedx509 @LIBS@
+ Cflags: -I${includedir}
+diff --git a/libevent_openssl.pc.in b/libevent_openssl.pc.in
+index f9da5ea..b09ecca 100644
+--- a/libevent_openssl.pc.in
++++ b/libevent_openssl.pc.in
+@@ -10,6 +10,6 @@ Description: libevent_openssl adds openssl-based TLS support to libevent
+ Version: @VERSION@
+ Requires: libevent_core
+ Requires.private: libssl
+-Libs: -L${libdir} -levent_openssl@CMAKE_DEBUG_POSTFIX@
++Libs: -L${libdir} -levent_openssl
+ Libs.private: @LIBS@
+ Cflags: -I${includedir}
+diff --git a/libevent_pthreads.pc.in b/libevent_pthreads.pc.in
+index 22f713d..8ac5642 100644
+--- a/libevent_pthreads.pc.in
++++ b/libevent_pthreads.pc.in
+@@ -9,6 +9,6 @@ Name: libevent_pthreads
+ Description: libevent_pthreads adds pthreads-based threading support to libevent
+ Version: @VERSION@
+ Requires: libevent_core
+-Libs: -L${libdir} -levent_pthreads@CMAKE_DEBUG_POSTFIX@
++Libs: -L${libdir} -levent_pthreads
+ Libs.private: @CMAKE_THREAD_LIBS_INIT@ @LIBS@
+ Cflags: -I${includedir}
+-- 
+2.43.0
+

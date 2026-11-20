@@ -4,7 +4,7 @@ menuconfig LIBEVENT_PV
 	tristate
 	select LIBC_RT
 	select GCCLIBS_GCC_S
-	select MBEDTLS_PV
+	select MBEDTLS
 	# installs the same headers and libraries
 	depends on !LIBEVENT
 	prompt "libevent 2.2 for Pantavisor   "
