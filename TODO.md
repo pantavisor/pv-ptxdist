@@ -14,7 +14,7 @@ Patches are based on PTXdist `master`, not on a release.
 |---|---|---|
 | mbedtls | Stock package, rule bumped to 2.28.10 (`rules/mbedtls.make`) | PTXdist patch to write |
 | dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | PTXdist patch to write |
-| busybox | Stock 1.38.0 + 5 Pantavisor patches | PTXdist patch to write |
+| busybox | Stock 1.38.0 + 5 Pantavisor patches | PTXdist patch to write for 0300-0303; MODALIAS (0304-0305) stays in this layer |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
 | lxc | `lxc6-pv` (LXC 6 fork, `bfa6810a`); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump PTXdist's lxc 3.0.1 to 6.0.x (meson) plus 11 fork patches; see section 3 |
 | libevent | Still `libevent-pv` 2.2.1-alpha | Blocked |
@@ -35,7 +35,7 @@ Patches are based on PTXdist `master`, not on a release.
       a NULL device name to `regexec()` for PCI devices without `DEVNAME`
       as soon as `mdev.conf` had a device-name rule. `0305` skips name
       rules for those devices; tested natively and on qemu-arm64.
-- [ ] **busybox: add the Pantavisor patches.** Add 0300-0305 to
+- [ ] **busybox: add the Pantavisor patches.** Add 0300-0303 to
       PTXdist's `patches/busybox-1.38.0/series`, and put
       `FEATURE_MDEV_FOLLOW_X_ROOT` into `config/busybox/util-linux/Config.in`.
       That lets `rules/busybox-pantavisor.in` go away (a layer can only
@@ -44,6 +44,12 @@ Patches are based on PTXdist `master`, not on a release.
       nsenter links without setpriv/run-init, `chdir()`/`chroot()` are
       checked when following the root, and nsenter.c and mdev.c build with
       no warnings beyond stock 1.38.0's. Every patch builds on its own.
+      MODALIAS (0304) and its fix (0305) stay in this layer: the PCI
+      modalias scan only serves Pantavisor's `system.drivers.load_early.auto`,
+      and it has no Kconfig switch, so upstream it would change `mdev -s`
+      for every PTXdist project. A layer's `patches/busybox-<version>/`
+      replaces PTXdist's, so this layer keeps PTXdist's whole series
+      plus 0304-0305, and re-checks it on every busybox bump.
 - [x] **lxc: version bump 3.0.1 -> 6.0.6.** Written on PTXdist master
       (4da61501e): `upstream/ptxdist/0001-lxc-version-bump-3.0.1-6.0.6.patch`.
       Meson, every option pinned (`configure_helper.py` shows no
@@ -63,9 +69,9 @@ least reviewed. Where that is possible, send them there first:
 - [ ] **dropbear `-n` any-user mode** (`patches/dropbear-2026.94/0200-*`):
       offer it to dropbear upstream (Matt Johnston). If it is refused,
       the RFC has to argue for carrying it in PTXdist.
-- [ ] **busybox patches**, mostly generic: nsenter `-C` and `--caps`, the
-      netlink and MODALIAS fixes. Send them to the busybox list;
-      `FOLLOW_X_ROOT` is more Pantavisor-specific.
+- [ ] **busybox patches**, mostly generic: nsenter `-C` and `--caps` and
+      the netlink fix. Send them to the busybox list;
+      `FOLLOW_X_ROOT` is more Pantavisor-specific. MODALIAS is not sent.
 - [ ] **Pantavisor** (Pantacor's repo, easy):
   - [ ] Merge `patches/pantavisor-031/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch`.
   - [ ] Drop `#include <lxc/pv_export.h>` from `plugins/pv_lxc.c`.
