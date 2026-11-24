@@ -7,7 +7,7 @@ menuconfig PANTAVISOR
 	select LIBTHTTP
 	select PICOHTTPPARSER
 	select MBEDTLS
-	select LXC6_PV				if PANTAVISOR_LXC_STABLE
+	select LXC				if PANTAVISOR_LXC_STABLE
 	select LXC_PV				if PANTAVISOR_LXC_DEPRECATED
 	select ZLIB
 	select LIBEVENT22
@@ -44,9 +44,9 @@ choice
 
 config PANTAVISOR_LXC_STABLE
 	bool
-	prompt "LXC 6 (lxc6-pv)"
+	prompt "LXC 6"
 	help
-	  LXC 6.0 LTS with the Pantavisor patches. Pantavisor picks the
+	  LXC 6.0 LTS with the Pantavisor patches (series.pantavisor). Pantavisor picks the
 	  cgroup version itself (PV_SYSTEM_CGROUP_VERSION=auto): cgroup
 	  v2 when the kernel has cgroup BPF, v1 otherwise.
 

@@ -16,7 +16,7 @@ Patches are based on PTXdist `master`, not on a release.
 | dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | `DROPBEAR_GENKEYS` patch sent 24 Nov 2026; the `-n` patch goes in the RFC, applied only with Pantavisor (`DROPBEAR_SERIES`) |
 | busybox | Stock 1.38.0 + 6 Pantavisor patches | In the RFC, applied only with Pantavisor (`BUSYBOX_SERIES`) |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
-| lxc | `lxc6-pv` (LXC 6 fork, `bfa6810a`); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump to 6.0.6 in PTXdist master (0bf3bd65e); fork patches in the RFC, see section 3 |
+| lxc | Stock 6.0.6 (master's rule) + `series.pantavisor` (12 fork patches); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump to 6.0.6 in PTXdist master (0bf3bd65e); fork patches in the RFC, see section 3 |
 | libevent | `libevent22` 2.2.2-alpha, static, private sysroot prefix, coexists with libevent 2.1 | RFC: a second, static libevent package only Pantavisor links |
 | picohttpparser, libthttp, pantavisor | Layer packages | The RFC itself |
 
@@ -52,8 +52,8 @@ Patches are based on PTXdist `master`, not on a release.
       without it, busybox gets 0200-0203 and dropbear nothing.
       `BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT` now depends on PANTAVISOR. The
       RFC patches are written on PTXdist master (d6b2c7954) and apply with
-      `git am`: `upstream/ptxdist/rfc/0007-busybox-*.patch` and
-      `0008-dropbear-*.patch` (RFC 7/8 and 8/8). They put the series files into PTXdist's
+      `git am`: `upstream/ptxdist/rfc/0006-busybox-*.patch` and
+      `0007-dropbear-*.patch` (RFC 6/8 and 7/8). They put the series files into PTXdist's
       `patches/busybox-1.38.0/` and a new `patches/dropbear-2026.94/`, and
       the symbols into `rules/busybox.in` and `rules/dropbear.in`.
       `FOLLOW_X_ROOT` goes into `rules/busybox.in` too, not
@@ -86,20 +86,39 @@ least reviewed. Where that is possible, send them there first:
   - [ ] Merge `patches/pantavisor-031/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch`.
   - [ ] Drop `#include <lxc/pv_export.h>` from `plugins/pv_lxc.c`.
         Nothing uses it, and it is the only reason lxc would need to
-        install that header.
+        install that header. Carried as
+        `patches/pantavisor-031/0002-plugins-pv_lxc-drop-the-unused-pv_export.h-include.patch`
+        until then.
   - [ ] Test setting `lxc.cgroup.dir` to `lxc/<name>` per container, so
         that lxc's default `lxc.payload.` prefix can stay (section 3).
 - [ ] **lxc 6 fork patches**: LXC 6.0 is maintained (LTS), so send the
       generic ones in section 3 to `lxc/lxc` first, before PTXdist.
 
-## 3. lxc: replace lxc6-pv with stock lxc 6 + patches
+## 3. lxc: stock lxc 6.0.6 + a Pantavisor-only series
 
-The layer builds `lxc6-pv`, meta-pantavisor's LXC 6 fork
-(`stable-6.0-BASE-f9ff9ea2a` at `bfa6810a`): upstream `stable-6.0` (v6.0.5
-+ 17 upstream commits) plus 14 Pantavisor commits, and meta-pantavisor's
-patch that stops meson forcing the gold linker. Pantavisor runs it with
-`PV_SYSTEM_CGROUP_VERSION=auto`, so cgroup v2 on our kernels (they have
-`CGROUP_BPF`). LXC 3 (`lxc-pv`) stays as the deprecated menu choice.
+Done 24 Nov 2026: the layer no longer builds `lxc6-pv`. It carries PTXdist
+master's lxc 6.0.6 rule (without `select LIBSELINUX`, which 2026.10.0
+lacks) plus `LXC_SERIES`, and `patches/lxc-6.0.6/series.pantavisor`: the
+fork's 14 Pantavisor commits (`bfa6810a`; its upstream base `f9ff9ea2a`
+is in v6.0.6) cherry-picked onto v6.0.6, without `pv_export.h`, the
+rebase notes and a `CLAUDE.md` that one commit added. Only conflict:
+the rebase notes. meta-pantavisor's gold-linker patch is not needed
+with 6.0.6. Pantavisor runs it with `PV_SYSTEM_CGROUP_VERSION=auto`, so
+cgroup v2 on our kernels (they have `CGROUP_BPF`). LXC 3 (`lxc-pv`)
+stays as the deprecated menu choice.
+
+Differences from the fork's build: stock lxc's `localstatedir` is
+`/var` (the fork used `/usr/var`), so the default lxcpath moved; the
+pantavisor package now installs `/etc/lxc/lxc.conf` with
+`lxc.lxcpath = /usr/var/lib/lxc`, where Pantavisor keeps its containers,
+so `fallbear-cmd`'s `lxc-info`/`lxc-console` find them (SSH into a
+container failed with "no container found" without it). lxc is now
+built with seccomp and installs all its tools. qemu-arm64: boot, SSH
+into `_pv_`, `os` and `pvr-sdk`, both containers STARTED, no lxc
+errors, `lxc/` cgroup prefix, Pantahub online.
+
+10 of the 12 patches have no Signed-off-by (Alexander Sack's); they are
+copied unchanged.
 
 ### Generic: send to lxc upstream, then carry in PTXdist
 
@@ -111,7 +130,7 @@ patch that stops meson forcing the gold linker. Pantavisor runs it with
 - [ ] `bfa6810a` the `lxc.tty.min` key.
 - [ ] `21cf380b` the `origin=mkdir` mount option.
 - [ ] `568fd7fd` the `lxc.rootfs.bdev_type` key.
-- [ ] The gold linker patch: check whether lxc main still forces gold.
+- [x] The gold linker patch: not needed with 6.0.6 (meson falls back).
 
 ### Pantavisor-specific
 
@@ -136,8 +155,8 @@ flagged in the cover letter either way.
 
 ### Dropped, nothing to do
 
-`0f491096` `pv_export.h` (nothing uses it once Pantavisor drops the
-include, section 2) and `c2017d42` (rebase notes).
+`0f491096` `pv_export.h` (Pantavisor uses nothing from it; the pantavisor
+package drops the include, section 2) and `c2017d42` (rebase notes).
 
 ### Validation
 
@@ -216,8 +235,11 @@ To do:
 Decided 24 Nov 2026: the Pantavisor-only series covers lxc and mbedtls
 too; the developer trust store stays in this layer; the initramfs layout
 folds into the pantavisor patch; the second libevent is `libevent22`.
-Order: the Pantavisor-only series refer to `PANTAVISOR`, so they come
-after the pantavisor package.
+Order (changed 24 Nov 2026): pantavisor comes last, so that PTXdist
+builds at every commit: Pantavisor needs the lxc series. Until 8/8 the
+series patches refer to a `PANTAVISOR` that does not exist yet and keep
+the stock series. The pantavisor patch drops the unused
+`#include <lxc/pv_export.h>` with a patch of its own.
 
 | # | Patch | State |
 |---|---|---|
@@ -225,11 +247,11 @@ after the pantavisor package.
 | 1/8 | picohttpparser: new package | written (`upstream/ptxdist/rfc/0001-*`) |
 | 2/8 | libthttp: new package | written (`0002-*`); certdata.txt from ca-certificates |
 | 3/8 | libevent22: new package (static, Pantavisor only) | written (`0003-*`) |
-| 4/8 | pantavisor: new package, with the initramfs layout | in this layer; adapt |
-| 5/8 | lxc: Pantavisor-only patch series | to write |
-| 6/8 | mbedtls: Pantavisor-only patch series (`pk_wrap.c`) | to write |
-| 7/8 | busybox: Pantavisor-only patch series | written (`0007-*`) |
-| 8/8 | dropbear: Pantavisor-only patch series | written (`0008-*`); needs the GENKEYS patch |
+| 4/8 | lxc: Pantavisor-only patch series | written (`0004-*`) |
+| 5/8 | mbedtls: Pantavisor-only patch series (`pk_wrap.c`) | to write |
+| 6/8 | busybox: Pantavisor-only patch series | written (`0006-*`) |
+| 7/8 | dropbear: Pantavisor-only patch series | written (`0007-*`); needs the GENKEYS patch |
+| 8/8 | pantavisor: new package, with the initramfs layout | in this layer; adapt |
 
 - [x] **picohttpparser**: upstream h2o/picohttpparser at 066d2b1 (what
       the Pantavisor fork is based on). Upstream has no build system for

@@ -83,6 +83,11 @@ PANTAVISOR_CFLAGS	:= \
 # The shipped config sets no cgroup version, which means v1 in embedded
 # mode. Set it per LXC runtime, as meta-pantavisor's pvbase.bbclass does:
 # LXC 3 only has cgroup v1.
+#
+# Pantavisor keeps its containers in $PV_SYSTEM_USRDIR/var/lib/lxc
+# (/usr/var/lib/lxc), and fallbear-cmd runs lxc-info and lxc-console without
+# -P. lxc.conf makes that liblxc's default lxcpath; stock lxc's is
+# /var/lib/lxc.
 PANTAVISOR_CGROUP_VERSION := $(call ptx/ifdef, PTXCONF_PANTAVISOR_LXC_DEPRECATED,1,auto)
 
 $(STATEDIR)/pantavisor.install:
@@ -93,6 +98,8 @@ $(STATEDIR)/pantavisor.install:
 	@sed -i '/^PV_SYSTEM_CGROUP_VERSION=/d' $(PANTAVISOR_PKGDIR)/etc/pantavisor.config
 	@echo 'PV_SYSTEM_CGROUP_VERSION=$(PANTAVISOR_CGROUP_VERSION)' >> \
 		$(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@mkdir -p $(PANTAVISOR_PKGDIR)/etc/lxc
+	@echo 'lxc.lxcpath = /usr/var/lib/lxc' > $(PANTAVISOR_PKGDIR)/etc/lxc/lxc.conf
 	@$(call touch)
 
 # ----------------------------------------------------------------------------
@@ -130,6 +137,7 @@ endif
 
 	@$(call install_tree, pantavisor, 0, 0, -, /etc/pantavisor)
 	@$(call install_alternative, pantavisor, 0, 0, 0644, /etc/pantavisor.config)
+	@$(call install_alternative, pantavisor, 0, 0, 0644, /etc/lxc/lxc.conf)
 
 	@$(call install_finish, pantavisor)
 

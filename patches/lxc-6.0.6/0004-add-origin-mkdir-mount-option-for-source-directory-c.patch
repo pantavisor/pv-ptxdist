@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Sat, 17 Jan 2026 13:26:33 +0000
+Subject: [PATCH] add origin=mkdir mount option for source directory creation
+
+This adds a new LXC-specific mount option "origin=mkdir" that creates
+the source directory if it doesn't exist before attempting the mount.
+
+Unlike "create=dir" which creates the mount target directory inside
+the container, "origin=mkdir" creates the source directory on the host.
+This is useful for bind mounts where the source path may not exist yet.
+---
+ src/lxc/conf.c | 13 +++++++++++++
+ src/lxc/conf.h |  5 ++++-
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/src/lxc/conf.c b/src/lxc/conf.c
+index 6a135ca53..bf2695158 100644
+--- a/src/lxc/conf.c
++++ b/src/lxc/conf.c
+@@ -2281,6 +2281,7 @@ const char *lxc_mount_options_info[LXC_MOUNT_MAX] = {
+ 	"optional",
+ 	"relative",
+ 	"idmap=",
++	"origin=mkdir",
+ };
+ 
+ /* Remove "optional", "create=dir", and "create=file" from mntopt */
+@@ -2331,6 +2332,9 @@ int parse_lxc_mount_attrs(struct lxc_mount_options *opts, char *mnt_opts)
+ 
+ 			TRACE("Parse LXC specific mount option %d->\"idmap=%s\"", fd_userns, opts->userns_path);
+ 			break;
++		case LXC_MOUNT_ORIGIN_MKDIR:
++			opts->origin_mkdir = 1;
++			break;
+ 		default:
+ 			return syserror_set(-EINVAL, "Unknown LXC specific mount option");
+ 		}
+@@ -2439,6 +2443,15 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
+ 	if (ret < 0)
+ 		return ret;
+ 
++	/* origin=mkdir: create the source directory if it doesn't exist */
++	if (opts.origin_mkdir) {
++		ret = lxc_mkdir_p(mntent->mnt_fsname, 0755);
++		if (ret < 0 && errno != EEXIST) {
++			SYSERROR("Failed to create source directory \"%s\" for mount", mntent->mnt_fsname);
++			return optional ? 0 : -1;
++		}
++	}
++
+ 	/*
+ 	 * Idmapped mount entries will be setup by the parent for us. Note that
+ 	 * we rely on mount_entry_create_dir_file() above to have already
+diff --git a/src/lxc/conf.h b/src/lxc/conf.h
+index 8907ac619..fe1bd85a8 100644
+--- a/src/lxc/conf.h
++++ b/src/lxc/conf.h
+@@ -208,7 +208,8 @@ typedef enum lxc_mount_options_t {
+ 	LXC_MOUNT_OPTIONAL	= 2,
+ 	LXC_MOUNT_RELATIVE	= 3,
+ 	LXC_MOUNT_IDMAP		= 4,
+-	LXC_MOUNT_MAX		= 5,
++	LXC_MOUNT_ORIGIN_MKDIR	= 5,
++	LXC_MOUNT_MAX		= 6,
+ } lxc_mount_options_t;
+ 
+ __hidden extern const char *lxc_mount_options_info[LXC_MOUNT_MAX];
+@@ -221,6 +222,7 @@ struct lxc_mount_options {
+ 	unsigned int bind_recursively : 1;
+ 	unsigned int propagate_recursively : 1;
+ 	unsigned int bind : 1;
++	unsigned int origin_mkdir : 1;
+ 	char userns_path[PATH_MAX];
+ 	unsigned long mnt_flags;
+ 	unsigned long prop_flags;
+@@ -672,6 +674,7 @@ static inline void put_lxc_mount_options(struct lxc_mount_options *mnt_opts)
+ 	mnt_opts->create_file = 0;
+ 	mnt_opts->optional = 0;
+ 	mnt_opts->relative = 0;
++	mnt_opts->origin_mkdir = 0;
+ 	mnt_opts->userns_path[0] = '\0';
+ 	mnt_opts->mnt_flags = 0;
+ 	mnt_opts->prop_flags = 0;

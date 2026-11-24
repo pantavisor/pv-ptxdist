@@ -1,0 +1,1717 @@
+From fc1ec4ce6b112471b59bd5faea1da2ec851d26ca Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Tue, 24 Nov 2026 17:17:10 -0300
+Subject: [RFC PATCH 4/8] lxc: add a Pantavisor-only patch series
+
+Pantavisor runs its containers with twelve lxc changes from its fork
+(github.com/pantavisor/lxc, stable-6.0), rebased onto 6.0.6:
+
+ - set_container_type(), lxc.rootfs.bdev_type and lxc.tty.min
+ - realpath_x(): resolve mount targets inside the container rootfs,
+   following its symlinks relative to the rootfs
+ - origin=mkdir for mount entries, escaped characters in quoted
+   strings, and hook commands with parameters
+ - the lxc/ cgroup prefix instead of lxc.payload.
+ - overlay mounts with upper and work directories outside the
+   container directory, and /exports mounts
+ - SIGCHLD blocked in run_buffer, and pivot_root mount propagation
+   matched in lxc_chroot
+
+Some of these change behaviour for every container, and realpath_x()
+follows symlinks that stock lxc refuses to follow on purpose
+(CVE-2015-1335). So they go into series.pantavisor, next to an empty
+series, and a hidden LXC_SERIES picks it when PANTAVISOR is enabled,
+as for busybox and dropbear. Other builds get stock lxc.
+
+The fork's pv_export.h header and its rebase notes are left out;
+Pantavisor does not need the header.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ ...et_container_type-API-for-Pantavisor.patch | 283 +++++++++++++
+ ...-Add-lxc.rootfs.bdev_type-config-key.patch |  74 ++++
+ ...h_x-for-virtual-root-path-resolution.patch | 377 ++++++++++++++++++
+ ...-mount-option-for-source-directory-c.patch |  84 ++++
+ ...ng_split_quoted-to-handle-escaped-ch.patch | 112 ++++++
+ ...roup-prefix-from-lxc.payload.-to-lxc.patch |  25 ++
+ ...upport-hook-commands-with-parameters.patch |  42 ++
+ ...unt-entries-with-upper-workdir-outsi.patch |  66 +++
+ ...upport-exports-mounts-for-Pantavisor.patch |  36 ++
+ ...-run_buffer-to-prevent-child-reaping.patch |  63 +++
+ ..._root-mount-propagation-in-lxc_chroo.patch |  70 ++++
+ ...tty.min-as-lower-bound-of-tty-alloca.patch | 304 ++++++++++++++
+ patches/lxc-6.0.6/series                      |   2 +
+ patches/lxc-6.0.6/series.pantavisor           |  15 +
+ rules/lxc.in                                  |   7 +
+ 15 files changed, 1560 insertions(+)
+ create mode 100644 patches/lxc-6.0.6/0001-Add-set_container_type-API-for-Pantavisor.patch
+ create mode 100644 patches/lxc-6.0.6/0002-Add-lxc.rootfs.bdev_type-config-key.patch
+ create mode 100644 patches/lxc-6.0.6/0003-Add-realpath_x-for-virtual-root-path-resolution.patch
+ create mode 100644 patches/lxc-6.0.6/0004-add-origin-mkdir-mount-option-for-source-directory-c.patch
+ create mode 100644 patches/lxc-6.0.6/0005-enhance-lxc_string_split_quoted-to-handle-escaped-ch.patch
+ create mode 100644 patches/lxc-6.0.6/0006-change-cgroup-prefix-from-lxc.payload.-to-lxc.patch
+ create mode 100644 patches/lxc-6.0.6/0007-support-hook-commands-with-parameters.patch
+ create mode 100644 patches/lxc-6.0.6/0008-allow-overlay-mount-entries-with-upper-workdir-outsi.patch
+ create mode 100644 patches/lxc-6.0.6/0009-support-exports-mounts-for-Pantavisor.patch
+ create mode 100644 patches/lxc-6.0.6/0010-block-SIGCHLD-in-run_buffer-to-prevent-child-reaping.patch
+ create mode 100644 patches/lxc-6.0.6/0011-conf-match-pivot_root-mount-propagation-in-lxc_chroo.patch
+ create mode 100644 patches/lxc-6.0.6/0012-confile-add-lxc.tty.min-as-lower-bound-of-tty-alloca.patch
+ create mode 100644 patches/lxc-6.0.6/series
+ create mode 100644 patches/lxc-6.0.6/series.pantavisor
+
+diff --git a/patches/lxc-6.0.6/0001-Add-set_container_type-API-for-Pantavisor.patch b/patches/lxc-6.0.6/0001-Add-set_container_type-API-for-Pantavisor.patch
+new file mode 100644
+index 000000000..bc5fd781c
+--- /dev/null
++++ b/patches/lxc-6.0.6/0001-Add-set_container_type-API-for-Pantavisor.patch
+@@ -0,0 +1,283 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:15:20 +0000
++Subject: [PATCH] Add set_container_type() API for Pantavisor
++
++Add API to override the container= environment variable that LXC sets
++for PID 1 inside containers. This allows Pantavisor to identify
++container types using custom values like "pv-mygroup" instead of "lxc".
++
++Changes:
++- Add char *type field to struct lxc_conf
++- Add set_container_type() function to lxc_container API
++- Use conf->type in start.c instead of hardcoded "lxc"
++---
++ src/lxc/conf.c         |  1 +
++ src/lxc/conf.h         |  3 ++
++ src/lxc/log.c          | 81 ++++++++++++++++++++++++++++++++++++++++++
++ src/lxc/log.h          |  1 +
++ src/lxc/lxccontainer.c | 17 +++++++++
++ src/lxc/lxccontainer.h | 19 ++++++++++
++ src/lxc/start.c        | 15 +++++---
++ 7 files changed, 132 insertions(+), 5 deletions(-)
++
++diff --git a/src/lxc/conf.c b/src/lxc/conf.c
++index d7f18035b..4a5ab4cfa 100644
++--- a/src/lxc/conf.c
+++++ b/src/lxc/conf.c
++@@ -4386,6 +4386,7 @@ void lxc_conf_free(struct lxc_conf *conf)
++ 	free(conf->cgroup_meta.systemd_scope);
++ 	free(conf->shmount.path_host);
++ 	free(conf->shmount.path_cont);
+++	free(conf->type);
++ 	free(conf);
++ }
++ 
++diff --git a/src/lxc/conf.h b/src/lxc/conf.h
++index 31cd39e3f..8907ac619 100644
++--- a/src/lxc/conf.h
+++++ b/src/lxc/conf.h
++@@ -577,6 +577,9 @@ struct lxc_conf {
++ 
++ 	bool sched_core;
++ 	__u64 sched_core_cookie;
+++
+++	/* Pantavisor: override container= environment variable */
+++	char *type;
++ };
++ 
++ extern thread_local struct lxc_conf *current_config;
++diff --git a/src/lxc/log.c b/src/lxc/log.c
++index 7f43e6d6f..8bf9afca5 100644
++--- a/src/lxc/log.c
+++++ b/src/lxc/log.c
++@@ -42,6 +42,7 @@
++ #define LXC_LOG_TIME_SIZE ((INTTYPE_TO_STRLEN(uint64_t)) * 2)
++ 
++ int lxc_log_fd = -EBADF;
+++int lxc_log_out_fd = -EBADF;
++ static bool wants_syslog = false;
++ static int lxc_quiet_specified;
++ bool lxc_log_use_global_fd = false;
++@@ -380,6 +381,53 @@ static int log_append_logfile(const struct lxc_log_appender *appender,
++ 	return lxc_write_nointr(fd_to_use, buffer, n + 1);
++ }
++ 
+++static int log_append_out_fd(const struct lxc_log_appender *appender,
+++			     struct lxc_log_event *event)
+++{
+++	char buffer[LXC_LOG_BUFFER_SIZE];
+++	char date_time[LXC_LOG_TIME_SIZE];
+++	int n;
+++	ssize_t ret;
+++	const char *log_container_name;
+++
+++	if (lxc_log_out_fd < 0)
+++		return 0;
+++
+++	log_container_name = lxc_log_get_container_name();
+++
+++	ret = lxc_unix_epoch_to_utc(date_time, LXC_LOG_TIME_SIZE, &event->timestamp);
+++	if (ret)
+++		return ret;
+++
+++	n = snprintf(buffer, sizeof(buffer),
+++		     "%s%s%s %s %-8s %s - %s:%s:%d - ",
+++		     log_prefix,
+++		     log_container_name ? " " : "",
+++		     log_container_name ? log_container_name : "",
+++		     date_time,
+++		     lxc_log_priority_to_string(event->priority),
+++		     event->category,
+++		     event->locinfo->file, event->locinfo->func,
+++		     event->locinfo->line);
+++	if (n < 0)
+++		return n;
+++
+++	if ((size_t)n < STRARRAYLEN(buffer)) {
+++		ret = vsnprintf(buffer + n, sizeof(buffer) - n, event->fmt, *event->vap);
+++		if (ret < 0)
+++			return 0;
+++
+++		n += ret;
+++	}
+++
+++	if ((size_t)n >= sizeof(buffer))
+++		n = STRARRAYLEN(buffer);
+++
+++	buffer[n] = '\n';
+++
+++	return lxc_write_nointr(lxc_log_out_fd, buffer, n + 1);
+++}
+++
++ #if HAVE_DLOG
++ static int log_append_dlog(const struct lxc_log_appender *appender,
++ 			     struct lxc_log_event *event)
++@@ -451,6 +499,12 @@ static struct lxc_log_appender log_appender_logfile = {
++ 	.next		= NULL,
++ };
++ 
+++static struct lxc_log_appender log_appender_out_fd = {
+++	.name		= "out_fd",
+++	.append		= log_append_out_fd,
+++	.next		= NULL,
+++};
+++
++ #if HAVE_DLOG
++ static struct lxc_log_appender log_appender_dlog = {
++ 	.name		= "dlog",
++@@ -737,10 +791,37 @@ void lxc_log_close(void)
++ 	free_disarm(log_vmname);
++ 
++ 	close_prot_errno_disarm(lxc_log_fd);
+++	close_prot_errno_disarm(lxc_log_out_fd);
++ 
++ 	free_disarm(log_fname);
++ }
++ 
+++int lxc_log_set_alternative_output(int fd)
+++{
+++	struct lxc_log_appender *appender;
+++
+++	if (fd < 0)
+++		return -EBADF;
+++
+++	lxc_log_out_fd = fcntl(fd, F_DUPFD_CLOEXEC, STDERR_FILENO);
+++	if (lxc_log_out_fd < 0)
+++		return -errno;
+++
+++	close(fd);
+++
+++	appender = lxc_log_category_lxc.appender;
+++	if (!appender) {
+++		lxc_log_category_lxc.appender = &log_appender_out_fd;
+++		return 0;
+++	}
+++
+++	while (appender->next)
+++		appender = appender->next;
+++
+++	appender->next = &log_appender_out_fd;
+++	return 0;
+++}
+++
++ int lxc_log_syslog(int facility)
++ {
++ 	struct lxc_log_appender *appender;
++diff --git a/src/lxc/log.h b/src/lxc/log.h
++index fcddc679a..e7e44b1d1 100644
++--- a/src/lxc/log.h
+++++ b/src/lxc/log.h
++@@ -671,6 +671,7 @@ __lxc_unused static inline void LXC_##LEVEL(struct lxc_log_locinfo* locinfo,	\
++ 	})
++ 
++ extern int lxc_log_fd;
+++extern int lxc_log_out_fd;
++ 
++ __hidden extern int lxc_log_syslog(int facility);
++ __hidden extern void lxc_log_syslog_enable(void);
++diff --git a/src/lxc/lxccontainer.c b/src/lxc/lxccontainer.c
++index ea3a31bb4..4d9d66402 100644
++--- a/src/lxc/lxccontainer.c
+++++ b/src/lxc/lxccontainer.c
++@@ -5238,6 +5238,22 @@ static bool do_lxcapi_set_timeout(struct lxc_container *c, int timeout)
++ 
++ WRAP_API_1(bool, lxcapi_set_timeout, int)
++ 
+++static bool do_lxcapi_set_container_type(struct lxc_container *c, const char *type)
+++{
+++	if (!c || !c->lxc_conf)
+++		return false;
+++
+++	free(c->lxc_conf->type);
+++	c->lxc_conf->type = NULL;
+++
+++	if (type)
+++		c->lxc_conf->type = strdup(type);
+++
+++	return true;
+++}
+++
+++WRAP_API_1(bool, lxcapi_set_container_type, const char *)
+++
++ struct lxc_container *lxc_container_new(const char *name, const char *configpath)
++ {
++ 	struct lxc_container *c;
++@@ -5382,6 +5398,7 @@ struct lxc_container *lxc_container_new(const char *name, const char *configpath
++ 	c->seccomp_notify_fd		= lxcapi_seccomp_notify_fd;
++ 	c->seccomp_notify_fd_active	= lxcapi_seccomp_notify_fd_active;
++ 	c->set_timeout			= lxcapi_set_timeout;
+++	c->set_container_type		= lxcapi_set_container_type;
++ 
++ 	return c;
++ 
++diff --git a/src/lxc/lxccontainer.h b/src/lxc/lxccontainer.h
++index ee94840bf..dc47fe57b 100644
++--- a/src/lxc/lxccontainer.h
+++++ b/src/lxc/lxccontainer.h
++@@ -899,6 +899,16 @@ struct lxc_container {
++ 	 * \return \c true on success, else \c false.
++ 	 */
++ 	bool (*set_timeout)(struct lxc_container *c, int timeout);
+++
+++	/*!
+++	 * \brief Override container= environment variable for init
+++	 *
+++	 * \param c Container
+++	 * \param type Container type string (e.g., "pv-mygroup")
+++	 *
+++	 * \return \c true on success, else \c false.
+++	 */
+++	bool (*set_container_type)(struct lxc_container *c, const char *type);
++ };
++ 
++ /*!
++@@ -1151,6 +1161,15 @@ int lxc_log_init(struct lxc_log *log);
++  */
++ void lxc_log_close(void);
++ 
+++/*!
+++ * \brief Set alternative output file descriptor for log capture.
+++ *
+++ * \param fd File descriptor to write log output to.
+++ *
+++ * \return 0 on success, negative errno on failure.
+++ */
+++int lxc_log_set_alternative_output(int fd);
+++
++ /*!
++  * \brief Check if the configuration item is supported by this LXC instance.
++  *
++diff --git a/src/lxc/start.c b/src/lxc/start.c
++index 8e29b404c..b7ce830ca 100644
++--- a/src/lxc/start.c
+++++ b/src/lxc/start.c
++@@ -284,7 +284,7 @@ restart:
++ 			if (fds_to_ignore[i] == fd)
++ 				break;
++ 
++-		if (fd == fddir || fd == lxc_log_fd ||
+++		if (fd == fddir || fd == lxc_log_fd || fd == lxc_log_out_fd ||
++ 		    (i < len_fds && fd == fds_to_ignore[i]))
++ 			continue;
++ 
++@@ -1362,10 +1362,15 @@ static int do_start(void *data)
++ 	if (ret < 0)
++ 		goto out_warn_father;
++ 
++-	ret = putenv("container=lxc");
++-	if (ret < 0) {
++-		SYSERROR("Failed to set environment variable: container=lxc");
++-		goto out_warn_father;
+++	{
+++		const char *container_type = handler->conf->type ? handler->conf->type : "lxc";
+++		char *container_env = must_make_path("container=", container_type, NULL);
+++		ret = putenv(container_env);
+++		if (ret < 0) {
+++			SYSERROR("Failed to set environment variable: %s", container_env);
+++			free(container_env);
+++			goto out_warn_father;
+++		}
++ 	}
++ 
++ 	if (handler->conf->ttys.tty_names) {
+diff --git a/patches/lxc-6.0.6/0002-Add-lxc.rootfs.bdev_type-config-key.patch b/patches/lxc-6.0.6/0002-Add-lxc.rootfs.bdev_type-config-key.patch
+new file mode 100644
+index 000000000..80ad30e5e
+--- /dev/null
++++ b/patches/lxc-6.0.6/0002-Add-lxc.rootfs.bdev_type-config-key.patch
+@@ -0,0 +1,74 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:20:28 +0000
++Subject: [PATCH] Add lxc.rootfs.bdev_type config key
++
++Expose rootfs.__bdev_type via the config API so external consumers
++can read the block device type separately from rootfs.path.
++
++This is needed because setting lxc.rootfs.path strips the bdev_type
++prefix, but Pantavisor needs to read it back for overlay configuration.
++---
++ src/lxc/confile.c | 21 +++++++++++++++++++++
++ 1 file changed, 21 insertions(+)
++
++diff --git a/src/lxc/confile.c b/src/lxc/confile.c
++index 5944e040a..08f5293e9 100644
++--- a/src/lxc/confile.c
+++++ b/src/lxc/confile.c
++@@ -137,6 +137,7 @@ lxc_config_define(no_new_privs);
++ lxc_config_define(personality);
++ lxc_config_define(prlimit);
++ lxc_config_define(pty_max);
+++lxc_config_define(rootfs_bdev_type);
++ lxc_config_define(rootfs_managed);
++ lxc_config_define(rootfs_mount);
++ lxc_config_define(rootfs_options);
++@@ -253,6 +254,7 @@ static struct lxc_config_t config_jump_table[] = {
++ 	{ "lxc.no_new_privs",	            true,  set_config_no_new_privs,               get_config_no_new_privs,               clr_config_no_new_privs,               },
++ 	{ "lxc.prlimit",                    false, set_config_prlimit,                    get_config_prlimit,                    clr_config_prlimit,                    },
++ 	{ "lxc.pty.max",                    true,  set_config_pty_max,                    get_config_pty_max,                    clr_config_pty_max,                    },
+++	{ "lxc.rootfs.bdev_type",           true,  set_config_rootfs_bdev_type,           get_config_rootfs_bdev_type,           clr_config_rootfs_bdev_type,           },
++ 	{ "lxc.rootfs.managed",             true,  set_config_rootfs_managed,             get_config_rootfs_managed,             clr_config_rootfs_managed,             },
++ 	{ "lxc.rootfs.mount",               true,  set_config_rootfs_mount,               get_config_rootfs_mount,               clr_config_rootfs_mount,               },
++ 	{ "lxc.rootfs.options",             true,  set_config_rootfs_options,             get_config_rootfs_options,             clr_config_rootfs_options,             },
++@@ -2821,6 +2823,12 @@ static int set_config_rootfs_managed(const char *key, const char *value,
++ 	return set_config_bool_item(&lxc_conf->rootfs.managed, value, true);
++ }
++ 
+++static int set_config_rootfs_bdev_type(const char *key, const char *value,
+++				       struct lxc_conf *lxc_conf, void *data)
+++{
+++	return set_config_path_item(&lxc_conf->rootfs.__bdev_type, value);
+++}
+++
++ static int set_config_rootfs_mount(const char *key, const char *value,
++ 				   struct lxc_conf *lxc_conf, void *data)
++ {
++@@ -4189,6 +4197,12 @@ static int get_config_rootfs_path(const char *key, char *retv, int inlen,
++ 	return lxc_get_conf_str(retv, inlen, c->rootfs.path);
++ }
++ 
+++static int get_config_rootfs_bdev_type(const char *key, char *retv, int inlen,
+++				       struct lxc_conf *c, void *data)
+++{
+++	return lxc_get_conf_str(retv, inlen, c->rootfs.__bdev_type);
+++}
+++
++ static int get_config_rootfs_managed(const char *key, char *retv, int inlen,
++ 				     struct lxc_conf *c, void *data)
++ {
++@@ -5000,6 +5014,13 @@ static inline int clr_config_rootfs_path(const char *key, struct lxc_conf *c,
++ 	return 0;
++ }
++ 
+++static inline int clr_config_rootfs_bdev_type(const char *key, struct lxc_conf *c,
+++					      void *data)
+++{
+++	free_disarm(c->rootfs.__bdev_type);
+++	return 0;
+++}
+++
++ static inline int clr_config_rootfs_managed(const char *key, struct lxc_conf *c,
++ 					    void *data)
++ {
+diff --git a/patches/lxc-6.0.6/0003-Add-realpath_x-for-virtual-root-path-resolution.patch b/patches/lxc-6.0.6/0003-Add-realpath_x-for-virtual-root-path-resolution.patch
+new file mode 100644
+index 000000000..1e50fcd17
+--- /dev/null
++++ b/patches/lxc-6.0.6/0003-Add-realpath_x-for-virtual-root-path-resolution.patch
+@@ -0,0 +1,377 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:23:21 +0000
++Subject: [PATCH] Add realpath_x() for virtual root path resolution
++
++Add custom realpath implementation that resolves symlinks within a
++virtual root directory. This is essential for handling mount targets
++that are symlinks pointing within the container rootfs.
++
++Based on FreeBSD realpath, modified to:
++- Resolve paths relative to a root directory
++- Keep symlink resolution within the root boundary
++- Not require final target to exist (for create=dir/file)
++---
++ src/lxc/conf.c       |  20 +++-
++ src/lxc/meson.build  |   2 +
++ src/lxc/realpath_x.c | 259 +++++++++++++++++++++++++++++++++++++++++++
++ src/lxc/realpath_x.h |  19 ++++
++ 4 files changed, 298 insertions(+), 2 deletions(-)
++ create mode 100644 src/lxc/realpath_x.c
++ create mode 100644 src/lxc/realpath_x.h
++
++diff --git a/src/lxc/conf.c b/src/lxc/conf.c
++index 4a5ab4cfa..6a135ca53 100644
++--- a/src/lxc/conf.c
+++++ b/src/lxc/conf.c
++@@ -56,6 +56,7 @@
++ #include "open_utils.h"
++ #include "parse.h"
++ #include "process_utils.h"
+++#include "realpath_x.h"
++ #include "ringbuf.h"
++ #include "start.h"
++ #include "storage/storage.h"
++@@ -2399,6 +2400,8 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
++ {
++ 	__do_free char *mntdata = NULL;
++ 	char *rootfs_path = NULL;
+++	char resolved_path[PATH_MAX];
+++	const char *mount_path;
++ 	int ret;
++ 	bool dev, optional, relative;
++ 	struct lxc_mount_options opts = {};
++@@ -2410,7 +2413,20 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
++ 	if (rootfs && rootfs->path)
++ 		rootfs_path = rootfs->mount;
++ 
++-	ret = mount_entry_create_dir_file(mntent, path, rootfs, lxc_name,
+++	/* Resolve symlinks in mount target path relative to rootfs */
+++	mount_path = path;
+++	if (rootfs_path) {
+++		size_t rootfs_len = strlen(rootfs_path);
+++		if (strncmp(path, rootfs_path, rootfs_len) == 0) {
+++			char *resolved = realpath_x(rootfs_path, path + rootfs_len, resolved_path);
+++			if (resolved) {
+++				mount_path = resolved;
+++				TRACE("Resolved mount path: %s -> %s", path, mount_path);
+++			}
+++		}
+++	}
+++
+++	ret = mount_entry_create_dir_file(mntent, mount_path, rootfs, lxc_name,
++ 					  lxc_path);
++ 	if (ret < 0) {
++ 		if (optional)
++@@ -2438,7 +2454,7 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
++ 		return -1;
++ 
++ 	ret = mount_entry(mntent->mnt_fsname,
++-			  path,
+++			  mount_path,
++ 			  mntent->mnt_type,
++ 			  opts.mnt_flags,
++ 			  opts.prop_flags,
++diff --git a/src/lxc/meson.build b/src/lxc/meson.build
++index dfb164558..13f737295 100644
++--- a/src/lxc/meson.build
+++++ b/src/lxc/meson.build
++@@ -120,6 +120,8 @@ liblxc_sources = files(
++     'process_utils.h',
++     'rexec.c',
++     'rexec.h',
+++    'realpath_x.c',
+++    'realpath_x.h',
++     'ringbuf.c',
++     'ringbuf.h',
++     'rtnl.c',
++diff --git a/src/lxc/realpath_x.c b/src/lxc/realpath_x.c
++new file mode 100644
++index 000000000..3961bb909
++--- /dev/null
+++++ b/src/lxc/realpath_x.c
++@@ -0,0 +1,259 @@
+++/* SPDX-License-Identifier: LGPL-2.1+ */
+++
+++/*
+++ * Pantacor realpath_x - resolve paths relative to a virtual root
+++ *
+++ * Based on FreeBSD realpath implementation:
+++ * Copyright (c) 2003 Constantin S. Svintsoff <kostik@iclub.nsu.ru>
+++ *
+++ * Pantavisor modifications:
+++ * Copyright (c) 2020 Pantacor Ltd
+++ * Author: Alexander Sack <asac@pantacor.com>
+++ */
+++
+++#include "config.h"
+++
+++#include <errno.h>
+++#include <stdio.h>
+++#include <stdlib.h>
+++#include <string.h>
+++#include <sys/param.h>
+++#include <sys/stat.h>
+++#include <unistd.h>
+++
+++#include "log.h"
+++
+++lxc_log_define(realpath_x, lxc);
+++
+++static size_t pv_strlcpy(char *dst, const char *src, size_t dsize)
+++{
+++	const char *osrc = src;
+++	size_t nleft = dsize;
+++
+++	if (nleft != 0) {
+++		while (--nleft != 0) {
+++			if ((*dst++ = *src++) == '\0')
+++				break;
+++		}
+++	}
+++
+++	if (nleft == 0) {
+++		if (dsize != 0)
+++			*dst = '\0';
+++		while (*src++)
+++			;
+++	}
+++
+++	return (src - osrc - 1);
+++}
+++
+++static size_t pv_strlcat(char *dst, const char *src, size_t siz)
+++{
+++	char *d = dst;
+++	const char *s = src;
+++	size_t n = siz;
+++	size_t dlen;
+++
+++	while (n-- != 0 && *d != '\0')
+++		d++;
+++	dlen = d - dst;
+++	n = siz - dlen;
+++
+++	if (n == 0)
+++		return (dlen + strlen(s));
+++	while (*s != '\0') {
+++		if (n != 1) {
+++			*d++ = *s;
+++			n--;
+++		}
+++		s++;
+++	}
+++	*d = '\0';
+++
+++	return (dlen + (s - src));
+++}
+++
+++/*
+++ * Find the real name of path relative to root, by removing all ".", ".."
+++ * and symlink components. Unlike standard realpath, this does not require
+++ * the final target to exist, and all symlink resolution stays within root.
+++ */
+++char *realpath_x(const char *root, const char *path, char *resolved)
+++{
+++	struct stat sb;
+++	char *p, *q, *s;
+++	size_t left_len, resolved_len;
+++	unsigned symlinks;
+++	int m, slen;
+++	char left[PATH_MAX], next_token[PATH_MAX], symlink[PATH_MAX];
+++	char root_path[PATH_MAX];
+++	size_t root_len;
+++
+++	TRACE("realpath_x: root=%s path=%s", root ? root : "(null)", path ? path : "(null)");
+++
+++	if (path == NULL) {
+++		errno = EINVAL;
+++		return NULL;
+++	}
+++	if (path[0] == '\0') {
+++		errno = ENOENT;
+++		return NULL;
+++	}
+++	if (resolved == NULL) {
+++		resolved = malloc(PATH_MAX);
+++		if (resolved == NULL)
+++			return NULL;
+++		m = 1;
+++	} else {
+++		m = 0;
+++	}
+++	if (root == NULL) {
+++		errno = EINVAL;
+++		if (m)
+++			free(resolved);
+++		return NULL;
+++	}
+++
+++	pv_strlcpy(root_path, root, sizeof(root_path));
+++	root_len = strlen(root_path);
+++	if (root_path[root_len - 1] != '/') {
+++		root_path[root_len] = '/';
+++		root_len++;
+++		root_path[root_len] = '\0';
+++	}
+++
+++	symlinks = 0;
+++	if (path[0] == '/') {
+++		pv_strlcpy(resolved, root_path, PATH_MAX);
+++		if (path[1] == '\0')
+++			return resolved;
+++		resolved_len = root_len;
+++		left_len = pv_strlcpy(left, path + 1, sizeof(left));
+++	} else {
+++		pv_strlcpy(resolved, root_path, PATH_MAX);
+++		resolved_len = strlen(resolved);
+++		left_len = pv_strlcpy(left, path, sizeof(left));
+++	}
+++
+++	if (left_len >= sizeof(left) || resolved_len >= PATH_MAX) {
+++		if (m)
+++			free(resolved);
+++		errno = ENAMETOOLONG;
+++		return NULL;
+++	}
+++
+++	while (left_len != 0) {
+++		p = strchr(left, '/');
+++		s = p ? p : left + left_len;
+++		if ((size_t)(s - left) >= sizeof(next_token)) {
+++			if (m)
+++				free(resolved);
+++			errno = ENAMETOOLONG;
+++			return NULL;
+++		}
+++		memcpy(next_token, left, s - left);
+++		next_token[s - left] = '\0';
+++		left_len -= s - left;
+++		if (p != NULL)
+++			memmove(left, s + 1, left_len + 1);
+++
+++		if (resolved[resolved_len - 1] != '/') {
+++			if (resolved_len + 1 >= PATH_MAX) {
+++				if (m)
+++					free(resolved);
+++				errno = ENAMETOOLONG;
+++				return NULL;
+++			}
+++			resolved[resolved_len++] = '/';
+++			resolved[resolved_len] = '\0';
+++		}
+++
+++		if (next_token[0] == '\0') {
+++			if (lstat(resolved, &sb) == 0 && !S_ISDIR(sb.st_mode)) {
+++				if (m)
+++					free(resolved);
+++				errno = ENOTDIR;
+++				return NULL;
+++			}
+++			continue;
+++		} else if (strcmp(next_token, ".") == 0) {
+++			continue;
+++		} else if (strcmp(next_token, "..") == 0) {
+++			if (resolved_len > root_len) {
+++				resolved[resolved_len - 1] = '\0';
+++				q = strrchr(resolved, '/') + 1;
+++				*q = '\0';
+++				resolved_len = q - resolved;
+++			}
+++			continue;
+++		}
+++
+++		resolved_len = pv_strlcat(resolved, next_token, PATH_MAX);
+++		if (resolved_len >= PATH_MAX) {
+++			if (m)
+++				free(resolved);
+++			errno = ENAMETOOLONG;
+++			return NULL;
+++		}
+++
+++		if (lstat(resolved, &sb) != 0) {
+++			/* Target doesn't exist yet - that's OK for create=dir/file */
+++			continue;
+++		}
+++
+++		if (S_ISLNK(sb.st_mode)) {
+++			if (symlinks++ > MAXSYMLINKS) {
+++				if (m)
+++					free(resolved);
+++				errno = ELOOP;
+++				return NULL;
+++			}
+++			slen = readlink(resolved, symlink, sizeof(symlink) - 1);
+++			if (slen < 0) {
+++				if (m)
+++					free(resolved);
+++				return NULL;
+++			}
+++			symlink[slen] = '\0';
+++
+++			if (symlink[0] == '/') {
+++				/* Absolute symlink - reset to root */
+++				resolved[root_len] = '\0';
+++				resolved_len = root_len;
+++			} else if (resolved_len > root_len) {
+++				/* Relative symlink - strip last component */
+++				resolved[resolved_len - 1] = '\0';
+++				q = strrchr(resolved, '/') + 1;
+++				*q = '\0';
+++				resolved_len = q - resolved;
+++			}
+++
+++			if (p != NULL) {
+++				if (symlink[slen - 1] != '/') {
+++					if ((size_t)(slen + 1) >= sizeof(symlink)) {
+++						if (m)
+++							free(resolved);
+++						errno = ENAMETOOLONG;
+++						return NULL;
+++					}
+++					symlink[slen] = '/';
+++					symlink[slen + 1] = '\0';
+++				}
+++				left_len = pv_strlcat(symlink, left, sizeof(symlink));
+++				if (left_len >= sizeof(left)) {
+++					if (m)
+++						free(resolved);
+++					errno = ENAMETOOLONG;
+++					return NULL;
+++				}
+++			}
+++			left_len = pv_strlcpy(left, symlink, sizeof(left));
+++		}
+++	}
+++
+++	if (resolved_len > 1 && resolved[resolved_len - 1] == '/')
+++		resolved[resolved_len - 1] = '\0';
+++
+++	TRACE("realpath_x: resolved=%s", resolved);
+++	return resolved;
+++}
++diff --git a/src/lxc/realpath_x.h b/src/lxc/realpath_x.h
++new file mode 100644
++index 000000000..718470fce
++--- /dev/null
+++++ b/src/lxc/realpath_x.h
++@@ -0,0 +1,19 @@
+++/* SPDX-License-Identifier: LGPL-2.1+ */
+++
+++/*
+++ * Pantacor realpath_x - resolve paths relative to a virtual root
+++ *
+++ * Copyright (c) 2020 Pantacor Ltd
+++ * Author: Alexander Sack <asac@pantacor.com>
+++ */
+++
+++#ifndef __LXC_REALPATH_X_H
+++#define __LXC_REALPATH_X_H
+++
+++/*
+++ * Resolve path relative to root, handling symlinks within the virtual root.
+++ * Unlike standard realpath(), this does not require the final target to exist.
+++ */
+++char *realpath_x(const char *root, const char *path, char *resolved);
+++
+++#endif /* __LXC_REALPATH_X_H */
+diff --git a/patches/lxc-6.0.6/0004-add-origin-mkdir-mount-option-for-source-directory-c.patch b/patches/lxc-6.0.6/0004-add-origin-mkdir-mount-option-for-source-directory-c.patch
+new file mode 100644
+index 000000000..294b773cd
+--- /dev/null
++++ b/patches/lxc-6.0.6/0004-add-origin-mkdir-mount-option-for-source-directory-c.patch
+@@ -0,0 +1,84 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:26:33 +0000
++Subject: [PATCH] add origin=mkdir mount option for source directory creation
++
++This adds a new LXC-specific mount option "origin=mkdir" that creates
++the source directory if it doesn't exist before attempting the mount.
++
++Unlike "create=dir" which creates the mount target directory inside
++the container, "origin=mkdir" creates the source directory on the host.
++This is useful for bind mounts where the source path may not exist yet.
++---
++ src/lxc/conf.c | 13 +++++++++++++
++ src/lxc/conf.h |  5 ++++-
++ 2 files changed, 17 insertions(+), 1 deletion(-)
++
++diff --git a/src/lxc/conf.c b/src/lxc/conf.c
++index 6a135ca53..bf2695158 100644
++--- a/src/lxc/conf.c
+++++ b/src/lxc/conf.c
++@@ -2281,6 +2281,7 @@ const char *lxc_mount_options_info[LXC_MOUNT_MAX] = {
++ 	"optional",
++ 	"relative",
++ 	"idmap=",
+++	"origin=mkdir",
++ };
++ 
++ /* Remove "optional", "create=dir", and "create=file" from mntopt */
++@@ -2331,6 +2332,9 @@ int parse_lxc_mount_attrs(struct lxc_mount_options *opts, char *mnt_opts)
++ 
++ 			TRACE("Parse LXC specific mount option %d->\"idmap=%s\"", fd_userns, opts->userns_path);
++ 			break;
+++		case LXC_MOUNT_ORIGIN_MKDIR:
+++			opts->origin_mkdir = 1;
+++			break;
++ 		default:
++ 			return syserror_set(-EINVAL, "Unknown LXC specific mount option");
++ 		}
++@@ -2439,6 +2443,15 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
++ 	if (ret < 0)
++ 		return ret;
++ 
+++	/* origin=mkdir: create the source directory if it doesn't exist */
+++	if (opts.origin_mkdir) {
+++		ret = lxc_mkdir_p(mntent->mnt_fsname, 0755);
+++		if (ret < 0 && errno != EEXIST) {
+++			SYSERROR("Failed to create source directory \"%s\" for mount", mntent->mnt_fsname);
+++			return optional ? 0 : -1;
+++		}
+++	}
+++
++ 	/*
++ 	 * Idmapped mount entries will be setup by the parent for us. Note that
++ 	 * we rely on mount_entry_create_dir_file() above to have already
++diff --git a/src/lxc/conf.h b/src/lxc/conf.h
++index 8907ac619..fe1bd85a8 100644
++--- a/src/lxc/conf.h
+++++ b/src/lxc/conf.h
++@@ -208,7 +208,8 @@ typedef enum lxc_mount_options_t {
++ 	LXC_MOUNT_OPTIONAL	= 2,
++ 	LXC_MOUNT_RELATIVE	= 3,
++ 	LXC_MOUNT_IDMAP		= 4,
++-	LXC_MOUNT_MAX		= 5,
+++	LXC_MOUNT_ORIGIN_MKDIR	= 5,
+++	LXC_MOUNT_MAX		= 6,
++ } lxc_mount_options_t;
++ 
++ __hidden extern const char *lxc_mount_options_info[LXC_MOUNT_MAX];
++@@ -221,6 +222,7 @@ struct lxc_mount_options {
++ 	unsigned int bind_recursively : 1;
++ 	unsigned int propagate_recursively : 1;
++ 	unsigned int bind : 1;
+++	unsigned int origin_mkdir : 1;
++ 	char userns_path[PATH_MAX];
++ 	unsigned long mnt_flags;
++ 	unsigned long prop_flags;
++@@ -672,6 +674,7 @@ static inline void put_lxc_mount_options(struct lxc_mount_options *mnt_opts)
++ 	mnt_opts->create_file = 0;
++ 	mnt_opts->optional = 0;
++ 	mnt_opts->relative = 0;
+++	mnt_opts->origin_mkdir = 0;
++ 	mnt_opts->userns_path[0] = '\0';
++ 	mnt_opts->mnt_flags = 0;
++ 	mnt_opts->prop_flags = 0;
+diff --git a/patches/lxc-6.0.6/0005-enhance-lxc_string_split_quoted-to-handle-escaped-ch.patch b/patches/lxc-6.0.6/0005-enhance-lxc_string_split_quoted-to-handle-escaped-ch.patch
+new file mode 100644
+index 000000000..e49c2fea0
+--- /dev/null
++++ b/patches/lxc-6.0.6/0005-enhance-lxc_string_split_quoted-to-handle-escaped-ch.patch
+@@ -0,0 +1,112 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:27:51 +0000
++Subject: [PATCH] enhance lxc_string_split_quoted to handle escaped characters
++
++Rewrote the string splitting function using a state machine to properly
++handle escaped quotes and backslashes within double-quoted strings.
++
++This enables init commands like: lxc.init.cmd = /bin/sh -c "echo \"hello\""
++
++The function now handles:
++- Escaped double quotes: \"
++- Escaped backslashes: \\
++- Transitions between unquoted and quoted sections
++---
++ src/lxc/string_utils.c | 54 +++++++++++++++++++++++++++++-------------
++ 1 file changed, 37 insertions(+), 17 deletions(-)
++
++diff --git a/src/lxc/string_utils.c b/src/lxc/string_utils.c
++index 2bb05139c..c79901efa 100644
++--- a/src/lxc/string_utils.c
+++++ b/src/lxc/string_utils.c
++@@ -351,10 +351,14 @@ static bool complete_word(char ***result, char *start, char *end, size_t *cap,
++ /*
++  * Given a a string 'one two "three four"', split into three words,
++  * one, two, and "three four"
+++ *
+++ * Handles escaped quotes within quoted strings: "hello \"world\""
+++ * Escape sequences: \" and \\ within double-quoted strings
++  */
++ char **lxc_string_split_quoted(char *string)
++ {
++-	char *nextword = string, *p, state;
+++	enum { SPACE, ARG, STR, STR_ESC } state = SPACE;
+++	char *nextword = string, *p;
++ 	char **result = NULL;
++ 	size_t result_capacity = 0;
++ 	size_t result_count = 0;
++@@ -362,41 +366,57 @@ char **lxc_string_split_quoted(char *string)
++ 	if (!string || !*string)
++ 		return calloc(1, sizeof(char *));
++ 
++-	// TODO I'm *not* handling escaped quote
++-	state = ' ';
++ 	for (p = string; *p; p++) {
++-		switch(state) {
++-		case ' ':
+++		switch (state) {
+++		case SPACE:
++ 			if (isspace(*p))
++ 				continue;
++-			else if (*p == '"' || *p == '\'') {
++-				nextword = p;
++-				state = *p;
+++			if (*p == '"') {
+++				nextword = p + 1;
+++				state = STR;
++ 				continue;
++ 			}
++ 			nextword = p;
++-			state = 'a';
+++			state = ARG;
++ 			continue;
++-		case 'a':
+++		case ARG:
+++			if (*p == '"') {
+++				complete_word(&result, nextword, p, &result_capacity, &result_count);
+++				nextword = p + 1;
+++				state = STR;
+++				continue;
+++			}
++ 			if (isspace(*p)) {
++ 				complete_word(&result, nextword, p, &result_capacity, &result_count);
++-				state = ' ';
+++				state = SPACE;
++ 				continue;
++ 			}
++ 			continue;
++-		case '"':
++-		case '\'':
++-			if (*p == state) {
++-				complete_word(&result, nextword+1, p, &result_capacity, &result_count);
++-				state = ' ';
+++		case STR:
+++			if (*p == '"') {
+++				complete_word(&result, nextword, p, &result_capacity, &result_count);
+++				state = SPACE;
++ 				continue;
++ 			}
+++			if (*p == '\\') {
+++				state = STR_ESC;
+++				continue;
+++			}
+++			continue;
+++		case STR_ESC:
+++			/* Handle escaped quote or backslash by removing the backslash */
+++			if (*p == '"' || *p == '\\')
+++				memmove(p - 1, p, strlen(p) + 1);
+++			state = STR;
++ 			continue;
++ 		}
++ 	}
++ 
++-	if (state == 'a')
+++	/* Handle unterminated argument or quoted string */
+++	if (state == ARG)
++ 		complete_word(&result, nextword, p, &result_capacity, &result_count);
+++	else if (state == STR || state == STR_ESC)
+++		complete_word(&result, nextword - 1, p, &result_capacity, &result_count);
++ 
++ 	if (result == NULL)
++ 		return calloc(1, sizeof(char *));
+diff --git a/patches/lxc-6.0.6/0006-change-cgroup-prefix-from-lxc.payload.-to-lxc.patch b/patches/lxc-6.0.6/0006-change-cgroup-prefix-from-lxc.payload.-to-lxc.patch
+new file mode 100644
+index 000000000..899f89d1f
+--- /dev/null
++++ b/patches/lxc-6.0.6/0006-change-cgroup-prefix-from-lxc.payload.-to-lxc.patch
+@@ -0,0 +1,25 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:28:43 +0000
++Subject: [PATCH] change cgroup prefix from lxc.payload. to lxc/
++
++Pantavisor expects container cgroups under "lxc/<name>" rather than
++"lxc.payload.<name>". This change reverts the upstream prefix change
++to maintain compatibility with the Pantavisor cgroup hierarchy.
++---
++ src/lxc/cgroups/cgroup.h | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/src/lxc/cgroups/cgroup.h b/src/lxc/cgroups/cgroup.h
++index 108e5d84e..a69239265 100644
++--- a/src/lxc/cgroups/cgroup.h
+++++ b/src/lxc/cgroups/cgroup.h
++@@ -18,7 +18,7 @@
++ 
++ #define DEFAULT_CGROUP_MOUNTPOINT_RELATIVE "sys/fs/cgroup"
++ #define DEFAULT_CGROUP_MOUNTPOINT "/sys/fs/cgroup"
++-#define DEFAULT_PAYLOAD_CGROUP_PREFIX "lxc.payload."
+++#define DEFAULT_PAYLOAD_CGROUP_PREFIX "lxc/"
++ #define DEFAULT_MONITOR_CGROUP_PREFIX "lxc.monitor."
++ #define DEFAULT_PAYLOAD_CGROUP "payload"
++ #define DEFAULT_MONITOR_CGROUP "monitor"
+diff --git a/patches/lxc-6.0.6/0007-support-hook-commands-with-parameters.patch b/patches/lxc-6.0.6/0007-support-hook-commands-with-parameters.patch
+new file mode 100644
+index 000000000..60da680e2
+--- /dev/null
++++ b/patches/lxc-6.0.6/0007-support-hook-commands-with-parameters.patch
+@@ -0,0 +1,42 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:30:08 +0000
++Subject: [PATCH] support hook commands with parameters
++
++Allow start hooks to include command-line parameters, e.g.:
++  lxc.hook.start = /usr/bin/script.sh arg1 arg2
++
++The verification now extracts just the command name (before any space)
++to check for file existence, while preserving the full command line
++for execution.
++---
++ src/lxc/conf.c | 12 ++++++++++++
++ 1 file changed, 12 insertions(+)
++
++diff --git a/src/lxc/conf.c b/src/lxc/conf.c
++index bf2695158..99360dbe9 100644
++--- a/src/lxc/conf.c
+++++ b/src/lxc/conf.c
++@@ -3541,10 +3541,22 @@ static bool verify_start_hooks(struct lxc_conf *conf)
++ 	list_for_each_entry(hook, &conf->hooks[LXCHOOK_START], head) {
++ 		int ret;
++ 		char *hookname = hook->val;
+++		char *cmdend, sav = '\0';
+++
+++		/* Extract command name without parameters for access check */
+++		cmdend = strchr(hookname, ' ');
+++		if (cmdend) {
+++			sav = *cmdend;
+++			*cmdend = '\0';
+++		}
++ 
++ 		ret = strnprintf(path, sizeof(path), "%s%s",
++ 			       conf->rootfs.path ? conf->rootfs.mount : "",
++ 			       hookname);
+++
+++		if (cmdend)
+++			*cmdend = sav;
+++
++ 		if (ret < 0)
++ 			return false;
++ 
+diff --git a/patches/lxc-6.0.6/0008-allow-overlay-mount-entries-with-upper-workdir-outsi.patch b/patches/lxc-6.0.6/0008-allow-overlay-mount-entries-with-upper-workdir-outsi.patch
+new file mode 100644
+index 000000000..8c7355714
+--- /dev/null
++++ b/patches/lxc-6.0.6/0008-allow-overlay-mount-entries-with-upper-workdir-outsi.patch
+@@ -0,0 +1,66 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:30:44 +0000
++Subject: [PATCH] allow overlay mount entries with upper/workdir outside
++ container dir
++
++Remove the restriction that overlay upperdir and workdir must be inside
++the container directory. They can now be anywhere as long as they are
++not inside the rootfs.
++
++This is useful for Pantavisor where overlay directories may be located
++outside the standard LXC container path.
++---
++ src/lxc/storage/overlay.c | 22 +++++++++++++---------
++ 1 file changed, 13 insertions(+), 9 deletions(-)
++
++diff --git a/src/lxc/storage/overlay.c b/src/lxc/storage/overlay.c
++index 443c8dc3c..05d2a083a 100644
++--- a/src/lxc/storage/overlay.c
+++++ b/src/lxc/storage/overlay.c
++@@ -611,22 +611,25 @@ int ovl_mkdir(const struct mntent *mntent, const struct lxc_rootfs *rootfs,
++ 		rootfs_dir = ovl_get_rootfs(rootfs_path, &rootfslen);
++ 		if (!rootfs_dir)
++ 			goto err;
++-
++-		dirlen = strlen(lxcpath);
++ 	}
++ 
+++	TRACE("ovl_mkdir: rootfs_dir=%s lxcdir=%s done parsing opts: upper=%s,work=%s",
+++	      rootfs_dir ? rootfs_dir : "<NA>",
+++	      lxcpath[0] ? lxcpath : "<NA>",
+++	      upperdir ? upperdir : "<NA>", workdir ? workdir : "<NA>");
+++
++ 	/*
++-	 * We neither allow users to create upperdirs and workdirs outside the
++-	 * containerdir nor inside the rootfs. The latter might be debatable.
++-	 * When we have a container without a rootfs we skip the checks.
+++	 * Allow upperdirs and workdirs outside the containerdir, but not inside
+++	 * the rootfs. When we have a container without a rootfs we skip the checks.
++ 	 */
++ 	ret = 0;
++ 	if (upperdir) {
++ 		if (!rootfs_path)
++ 			ret = lxc_mkdir_p(upperdir, 0755);
++-		else if (!strncmp(upperdir, lxcpath, dirlen) &&
++-			 strncmp(upperdir, rootfs_dir, rootfslen))
+++		else if (strncmp(upperdir, rootfs_dir, rootfslen))
++ 			ret = lxc_mkdir_p(upperdir, 0755);
+++		else
+++			INFO("Invalid upperdir (%s): must not be inside rootfs (%s)", upperdir, rootfs_dir);
++ 
++ 		if (ret < 0)
++ 			SYSWARN("Failed to create directory \"%s\"", upperdir);
++@@ -636,9 +639,10 @@ int ovl_mkdir(const struct mntent *mntent, const struct lxc_rootfs *rootfs,
++ 	if (workdir) {
++ 		if (!rootfs_path)
++ 			ret = lxc_mkdir_p(workdir, 0755);
++-		else if (!strncmp(workdir, lxcpath, dirlen) &&
++-			 strncmp(workdir, rootfs_dir, rootfslen))
+++		else if (strncmp(workdir, rootfs_dir, rootfslen))
++ 			ret = lxc_mkdir_p(workdir, 0755);
+++		else
+++			INFO("Invalid workdir (%s): must not be inside rootfs (%s)", workdir, rootfs_dir);
++ 
++ 		if (ret < 0)
++ 			SYSWARN("Failed to create directory \"%s\"", workdir);
+diff --git a/patches/lxc-6.0.6/0009-support-exports-mounts-for-Pantavisor.patch b/patches/lxc-6.0.6/0009-support-exports-mounts-for-Pantavisor.patch
+new file mode 100644
+index 000000000..4453c3a33
+--- /dev/null
++++ b/patches/lxc-6.0.6/0009-support-exports-mounts-for-Pantavisor.patch
+@@ -0,0 +1,36 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:36:25 +0000
++Subject: [PATCH] support /exports mounts for Pantavisor
++
++Skip unmounting /exports during chroot and preserve shared mount
++propagation for exports mounts. This is needed for Pantavisor's
++exports mechanism where containers can expose directories to
++other containers.
++---
++ src/lxc/conf.c | 5 ++++-
++ 1 file changed, 4 insertions(+), 1 deletion(-)
++
++diff --git a/src/lxc/conf.c b/src/lxc/conf.c
++index 99360dbe9..c0bd87699 100644
++--- a/src/lxc/conf.c
+++++ b/src/lxc/conf.c
++@@ -1315,6 +1315,9 @@ static int lxc_chroot(const struct lxc_rootfs *rootfs)
++ 			if (strequal(slider1 + 1, "/proc"))
++ 				continue;
++ 
+++			if (strnequal(slider1 + 1, "/exports", 8))
+++				continue;
+++
++ 			ret = umount2(slider1, MNT_DETACH);
++ 			if (ret == 0)
++ 				progress++;
++@@ -3476,7 +3479,7 @@ static void turn_into_dependent_mounts(const struct lxc_rootfs *rootfs)
++ 			continue;
++ 
++ 		null_endofword(opts);
++-		if (!strstr(opts, "shared"))
+++		if (!strstr(opts, "shared") || strstr(target, "exports"))
++ 			continue;
++ 
++ 		null_endofword(target);
+diff --git a/patches/lxc-6.0.6/0010-block-SIGCHLD-in-run_buffer-to-prevent-child-reaping.patch b/patches/lxc-6.0.6/0010-block-SIGCHLD-in-run_buffer-to-prevent-child-reaping.patch
+new file mode 100644
+index 000000000..fcb3f9f53
+--- /dev/null
++++ b/patches/lxc-6.0.6/0010-block-SIGCHLD-in-run_buffer-to-prevent-child-reaping.patch
+@@ -0,0 +1,63 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Sat, 17 Jan 2026 13:36:54 +0000
++Subject: [PATCH] block SIGCHLD in run_buffer to prevent child reaping issues
++
++Block SIGCHLD during the lxc_popen/lxc_pclose critical section to
++prevent the parent process (e.g., Pantavisor) from reaping the child
++before lxc_pclose() can retrieve its exit status.
++
++This replaces the earlier setpgrp() approach which was insufficient.
++---
++ src/lxc/start.c |  3 ++-
++ src/lxc/utils.c | 16 ++++++++++++++++
++ 2 files changed, 18 insertions(+), 1 deletion(-)
++
++diff --git a/src/lxc/start.c b/src/lxc/start.c
++index b7ce830ca..3d7a61a28 100644
++--- a/src/lxc/start.c
+++++ b/src/lxc/start.c
++@@ -1362,7 +1362,8 @@ static int do_start(void *data)
++ 	if (ret < 0)
++ 		goto out_warn_father;
++ 
++-	{
+++	/* Set container= env var unless type is "pv-root" (Pantavisor root platform) */
+++	if (!handler->conf->type || !strequal(handler->conf->type, "pv-root")) {
++ 		const char *container_type = handler->conf->type ? handler->conf->type : "lxc";
++ 		char *container_env = must_make_path("container=", container_type, NULL);
++ 		ret = putenv(container_env);
++diff --git a/src/lxc/utils.c b/src/lxc/utils.c
++index 1e41d642a..c4712f046 100644
++--- a/src/lxc/utils.c
+++++ b/src/lxc/utils.c
++@@ -536,6 +536,18 @@ static int run_buffer(char *buffer)
++ 	__do_free char *output = NULL;
++ 	__do_lxc_pclose struct lxc_popen_FILE *f = NULL;
++ 	int fd, ret;
+++	sigset_t set, oldset;
+++
+++	/*
+++	 * Block SIGCHLD to prevent the parent process from reaping
+++	 * the child before lxc_pclose() can do so. This is needed when
+++	 * LXC is used as a library (e.g., by Pantavisor).
+++	 */
+++	sigemptyset(&set);
+++	sigaddset(&set, SIGCHLD);
+++	ret = pthread_sigmask(SIG_BLOCK, &set, &oldset);
+++	if (ret != 0)
+++		SYSWARN("Failed to block SIGCHLD");
++ 
++ 	f = lxc_popen(buffer);
++ 	if (!f)
++@@ -563,6 +575,10 @@ static int run_buffer(char *buffer)
++ 	}
++ 
++ 	ret = lxc_pclose(move_ptr(f));
+++
+++	/* Restore the original signal mask */
+++	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+++
++ 	if (ret == -1)
++ 		return log_error_errno(-1, errno, "Script exited with error");
++ 	else if (WIFEXITED(ret) && WEXITSTATUS(ret) != 0)
+diff --git a/patches/lxc-6.0.6/0011-conf-match-pivot_root-mount-propagation-in-lxc_chroo.patch b/patches/lxc-6.0.6/0011-conf-match-pivot_root-mount-propagation-in-lxc_chroo.patch
+new file mode 100644
+index 000000000..325630f31
+--- /dev/null
++++ b/patches/lxc-6.0.6/0011-conf-match-pivot_root-mount-propagation-in-lxc_chroo.patch
+@@ -0,0 +1,70 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <alexander.sack@pantacor.com>
++Date: Fri, 16 Oct 2026 12:29:29 +0000
++Subject: [PATCH] conf: match pivot_root mount propagation in lxc_chroot
++
++lxc_chroot() made the whole tree private, dropping the propagation the
++rootfs and lxc.mount.entry lines asked for. Keep it, as lxc_pivot_root()
++does, and only make the old tree slave before it is unmounted.
++
++Signed-off-by: Alexander Sack <alexander.sack@pantacor.com>
++---
++ src/lxc/conf.c | 23 +++++++++++++++++++++--
++ 1 file changed, 21 insertions(+), 2 deletions(-)
++
++diff --git a/src/lxc/conf.c b/src/lxc/conf.c
++index c0bd87699..98232c38a 100644
++--- a/src/lxc/conf.c
+++++ b/src/lxc/conf.c
++@@ -1270,9 +1270,21 @@ static int lxc_chroot(const struct lxc_rootfs *rootfs)
++ 	if (ret < 0)
++ 		return log_error_errno(-1, errno, "Failed to mount \"%s\" onto \"/\" as MS_REC | MS_BIND", nroot);
++ 
++-	ret = mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL);
+++	/*
+++	 * The copy on "/" keeps the propagation the rootfs and the mount
+++	 * entries were set up with, as with pivot_root(). Turn the old root
+++	 * and the old rootfs into dependent mounts instead, so cleaning them
+++	 * up below propagates neither to the host nor into the copy. "/"
+++	 * still resolves to the old root here and MS_REC on it would also
+++	 * reach the copy.
+++	 */
+++	ret = mount(NULL, "/", NULL, MS_SLAVE, NULL);
+++	if (ret < 0)
+++		return log_error_errno(-1, errno, "Failed to turn old root into dependent mount");
+++
+++	ret = mount(NULL, nroot, NULL, MS_SLAVE | MS_REC, NULL);
++ 	if (ret < 0)
++-		return log_error_errno(-1, errno, "Failed to remount \"/\"");
+++		return log_error_errno(-1, errno, "Failed to recursively turn \"%s\" into dependent mount", nroot);
++ 
++ 	/* The following code cleans up inherited mounts which are not required
++ 	 * for CT.
++@@ -1318,6 +1330,7 @@ static int lxc_chroot(const struct lxc_rootfs *rootfs)
++ 			if (strnequal(slider1 + 1, "/exports", 8))
++ 				continue;
++ 
+++			(void)mount(NULL, slider1, NULL, MS_SLAVE | MS_REC, NULL);
++ 			ret = umount2(slider1, MNT_DETACH);
++ 			if (ret == 0)
++ 				progress++;
++@@ -1328,6 +1341,7 @@ static int lxc_chroot(const struct lxc_rootfs *rootfs)
++ 	}
++ 
++ 	/* This also can be skipped if a container uses userns. */
+++	(void)mount(NULL, "./proc", NULL, MS_SLAVE | MS_REC, NULL);
++ 	(void)umount2("./proc", MNT_DETACH);
++ 
++ 	/* It is weird, but chdir("..") moves us in a new root */
++@@ -1339,6 +1353,11 @@ static int lxc_chroot(const struct lxc_rootfs *rootfs)
++ 	if (ret < 0)
++ 		return log_error_errno(-1, errno, "Failed to chroot(\".\")");
++ 
+++	/* Same as lxc_pivot_root(): the rootfs becomes its own peer group. */
+++	ret = mount("", "/", "", MS_SHARED | MS_REC, NULL);
+++	if (ret < 0)
+++		return log_error_errno(-1, errno, "Failed to turn new root mount tree into shared mount tree");
+++
++ 	return 0;
++ }
++ 
+diff --git a/patches/lxc-6.0.6/0012-confile-add-lxc.tty.min-as-lower-bound-of-tty-alloca.patch b/patches/lxc-6.0.6/0012-confile-add-lxc.tty.min-as-lower-bound-of-tty-alloca.patch
+new file mode 100644
+index 000000000..2984b3ae7
+--- /dev/null
++++ b/patches/lxc-6.0.6/0012-confile-add-lxc.tty.min-as-lower-bound-of-tty-alloca.patch
+@@ -0,0 +1,304 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <alexander.sack@pantacor.com>
++Date: Thu, 5 Nov 2026 09:50:25 +0000
++Subject: [PATCH] confile: add lxc.tty.min as lower bound of tty allocation
++
++The 3.0 branch had this key only as a recipe patch, so the rebase to 6.0
++dropped it and a config with lxc.tty.min failed to load.
++
++With lxc.tty.min = 3 and lxc.tty.max = 6, only /dev/tty4 to /dev/tty6
++are made container ttys and /dev/tty1 to /dev/tty3 are left alone. The
++default of 0 behaves as before. A min that is not below max sets up no
++ttys. A console request for a tty at or below min is refused.
++
++Signed-off-by: Alexander Sack <alexander.sack@pantacor.com>
++---
++ doc/lxc.container.conf.sgml.in | 14 ++++++++++++
++ src/lxc/conf.c                 | 33 +++++++++++++++-------------
++ src/lxc/conf.h                 |  4 +++-
++ src/lxc/confile.c              | 39 ++++++++++++++++++++++++++++++++++
++ src/lxc/terminal.c             |  6 +++---
++ 5 files changed, 77 insertions(+), 19 deletions(-)
++
++diff --git a/doc/lxc.container.conf.sgml.in b/doc/lxc.container.conf.sgml.in
++index 20ae63fd4..7a91cc41a 100644
++--- a/doc/lxc.container.conf.sgml.in
+++++ b/doc/lxc.container.conf.sgml.in
++@@ -1024,6 +1024,20 @@
++             </para>
++           </listitem>
++         </varlistentry>
+++        <varlistentry>
+++          <term>
+++            <option>lxc.tty.min</option>
+++          </term>
+++          <listitem>
+++            <para>
+++              Number of leading ttys to leave alone. With
+++              <option>lxc.tty.min = 3</option> and
+++              <option>lxc.tty.max = 6</option>, only
+++              <filename>/dev/tty4</filename> to <filename>/dev/tty6</filename>
+++              are made available. Defaults to 0.
+++            </para>
+++          </listitem>
+++        </varlistentry>
++       </variablelist>
++     </refsect2>
++ 
++diff --git a/src/lxc/conf.c b/src/lxc/conf.c
++index 98232c38a..76ae09de7 100644
++--- a/src/lxc/conf.c
+++++ b/src/lxc/conf.c
++@@ -777,7 +777,7 @@ static int lxc_setup_ttys(struct lxc_conf *conf)
++ 	if (!conf->rootfs.path)
++ 		return 0;
++ 
++-	for (size_t i = 0; i < ttys->max; i++) {
+++	for (size_t i = ttys->min; i < ttys->max; i++) {
++ 		__do_close int fd_to = -EBADF;
++ 		struct lxc_terminal_info *tty = &ttys->tty[i];
++ 
++@@ -866,7 +866,8 @@ static int lxc_setup_ttys(struct lxc_conf *conf)
++ 			return log_error(-1, "Error setting up container_ttys string");
++ 	}
++ 
++-	INFO("Finished setting up %zu /dev/tty<N> device(s)", ttys->max);
+++	INFO("Finished setting up %zu /dev/tty<N> device(s)",
+++	     ttys->max > ttys->min ? ttys->max - ttys->min : (size_t)0);
++ 	return 0;
++ }
++ 
++@@ -878,14 +879,14 @@ static int lxc_allocate_ttys(struct lxc_conf *conf)
++ 	int ret;
++ 
++ 	/* no tty in the configuration */
++-	if (ttys->max == 0)
+++	if (ttys->max == 0 || ttys->min >= ttys->max)
++ 		return 0;
++ 
++ 	ttys->tty = zalloc(sizeof(struct lxc_terminal_info) * ttys->max);
++ 	if (!ttys->tty)
++ 		return -ENOMEM;
++ 
++-	for (size_t i = 0; i < conf->ttys.max; i++) {
+++	for (size_t i = ttys->min; i < conf->ttys.max; i++) {
++ 		struct lxc_terminal_info *tty = &ttys->tty[i];
++ 
++ 		ret = lxc_devpts_terminal(conf->devpts_fd, &tty->ptx,
++@@ -903,7 +904,7 @@ static int lxc_allocate_ttys(struct lxc_conf *conf)
++ 		tty->busy = -1;
++ 	}
++ 
++-	INFO("Finished creating %zu tty devices", ttys->max);
+++	INFO("Finished creating %zu tty devices", ttys->max - ttys->min);
++ 	move_ptr(ttys);
++ 	return 0;
++ }
++@@ -913,7 +914,7 @@ void lxc_delete_tty(struct lxc_tty_info *ttys)
++ 	if (!ttys || !ttys->tty)
++ 		return;
++ 
++-	for (size_t i = 0; i < ttys->max; i++) {
+++	for (size_t i = ttys->min; i < ttys->max; i++) {
++ 		struct lxc_terminal_info *tty = &ttys->tty[i];
++ 		close_prot_errno_disarm(tty->ptx);
++ 		close_prot_errno_disarm(tty->pty);
++@@ -929,10 +930,10 @@ static int __lxc_send_ttys_to_parent(struct lxc_handler *handler)
++ 	struct lxc_tty_info *ttys = &conf->ttys;
++ 	int sock = handler->data_sock[0];
++ 
++-	if (ttys->max == 0)
+++	if (ttys->max == 0 || ttys->min >= ttys->max)
++ 		return 0;
++ 
++-	for (size_t i = 0; i < ttys->max; i++) {
+++	for (size_t i = ttys->min; i < ttys->max; i++) {
++ 		int ttyfds[2];
++ 		struct lxc_terminal_info *tty = &ttys->tty[i];
++ 
++@@ -948,9 +949,9 @@ static int __lxc_send_ttys_to_parent(struct lxc_handler *handler)
++ 	}
++ 
++ 	if (ret < 0)
++-		SYSERROR("Failed to send %zu ttys to parent", ttys->max);
+++		SYSERROR("Failed to send %zu ttys to parent", ttys->max - ttys->min);
++ 	else
++-		TRACE("Sent %zu ttys to parent", ttys->max);
+++		TRACE("Sent %zu ttys to parent", ttys->max - ttys->min);
++ 
++ 	return ret;
++ }
++@@ -1499,7 +1500,8 @@ static int lxc_setup_devpts_child(struct lxc_handler *handler)
++ 	size_t pty_max = conf->pty_max;
++ 	int ret;
++ 
++-	pty_max += conf->ttys.max;
+++	if (conf->ttys.max > conf->ttys.min)
+++		pty_max += conf->ttys.max - conf->ttys.min;
++ 	if (pty_max <= 0)
++ 		return log_debug(0, "No new devpts instance will be mounted since no pts devices are required");
++ 
++@@ -3754,10 +3756,11 @@ static int lxc_recv_ttys_from_child(struct lxc_handler *handler)
++ 	struct lxc_conf *conf = handler->conf;
++ 	struct lxc_tty_info *tty_info = &conf->ttys;
++ 	size_t ttys_max = tty_info->max;
+++	size_t ttys_min = tty_info->min;
++ 	struct lxc_terminal_info *terminal_info;
++ 	int ret;
++ 
++-	if (!ttys_max)
+++	if (!ttys_max || ttys_min >= ttys_max)
++ 		return 0;
++ 
++ 	info_new->tty = malloc(sizeof(*(info_new->tty)) * ttys_max);
++@@ -3772,12 +3775,12 @@ static int lxc_recv_ttys_from_child(struct lxc_handler *handler)
++ 		terminal_info->pty = -EBADF;
++ 	}
++ 
++-	for (size_t i = 0; i < ttys_max; i++) {
+++	for (size_t i = ttys_min; i < ttys_max; i++) {
++ 		int ptx = -EBADF, pty = -EBADF;
++ 
++ 		ret = lxc_abstract_unix_recv_two_fds(sock, &ptx, &pty);
++ 		if (ret < 0)
++-			return syserror("Failed to receive %zu ttys from child", ttys_max);
+++			return syserror("Failed to receive %zu ttys from child", ttys_max - ttys_min);
++ 
++ 		terminal_info = &info_new->tty[i];
++ 		terminal_info->ptx = ptx;
++@@ -3787,7 +3790,7 @@ static int lxc_recv_ttys_from_child(struct lxc_handler *handler)
++ 	}
++ 
++ 	tty_info->tty = move_ptr(info_new->tty);
++-	TRACE("Received %zu ttys from child", ttys_max);
+++	TRACE("Received %zu ttys from child", ttys_max - ttys_min);
++ 	return 0;
++ }
++ 
++diff --git a/src/lxc/conf.h b/src/lxc/conf.h
++index fe1bd85a8..8159b01a4 100644
++--- a/src/lxc/conf.h
+++++ b/src/lxc/conf.h
++@@ -193,10 +193,12 @@ struct id_map {
++ 
++ /* Defines the number of tty configured and contains the
++  * instantiated ptys
++- * @max = number of configured ttys
+++ * @max = highest configured tty index (1-based)
+++ * @min = number of leading ttys to skip; tty(min+1)..tty(max) are set up
++  */
++ struct lxc_tty_info {
++ 	size_t max;
+++	size_t min;
++ 	char *dir;
++ 	char *tty_names;
++ 	struct lxc_terminal_info *tty;
++diff --git a/src/lxc/confile.c b/src/lxc/confile.c
++index 08f5293e9..0add7b4a1 100644
++--- a/src/lxc/confile.c
+++++ b/src/lxc/confile.c
++@@ -153,6 +153,7 @@ lxc_config_define(signal_reboot);
++ lxc_config_define(signal_stop);
++ lxc_config_define(start);
++ lxc_config_define(tty_max);
+++lxc_config_define(tty_min);
++ lxc_config_define(tty_dir);
++ lxc_config_define(uts_name);
++ lxc_config_define(sysctl);
++@@ -273,6 +274,7 @@ static struct lxc_config_t config_jump_table[] = {
++ 	{ "lxc.start.order",                true,  set_config_start,                      get_config_start,                      clr_config_start,                      },
++ 	{ "lxc.tty.dir",                    true,  set_config_tty_dir,                    get_config_tty_dir,                    clr_config_tty_dir,                    },
++ 	{ "lxc.tty.max",                    true,  set_config_tty_max,                    get_config_tty_max,                    clr_config_tty_max,                    },
+++	{ "lxc.tty.min",                    true,  set_config_tty_min,                    get_config_tty_min,                    clr_config_tty_min,                    },
++ 	{ "lxc.uts.name",                   true,  set_config_uts_name,                   get_config_uts_name,                   clr_config_uts_name,                   },
++ 	{ "lxc.sysctl",                     false, set_config_sysctl,                     get_config_sysctl,                     clr_config_sysctl,                     },
++ 	{ "lxc.proc",                       false, set_config_proc,                       get_config_proc,                       clr_config_proc,                       },
++@@ -1637,6 +1639,30 @@ static int set_config_tty_max(const char *key, const char *value,
++ 	return 0;
++ }
++ 
+++static int set_config_tty_min(const char *key, const char *value,
+++			      struct lxc_conf *lxc_conf, void *data)
+++{
+++	int ret;
+++	unsigned int nbtty = 0;
+++
+++	if (lxc_config_value_empty(value)) {
+++		lxc_conf->ttys.min = 0;
+++		return 0;
+++	}
+++
+++	ret = lxc_safe_uint(value, &nbtty);
+++	if (ret < 0)
+++		return ret;
+++
+++	/* min is compared as int and as size_t + 1 elsewhere */
+++	if (nbtty > INT_MAX)
+++		return -ERANGE;
+++
+++	lxc_conf->ttys.min = nbtty;
+++
+++	return 0;
+++}
+++
++ static int set_config_tty_dir(const char *key, const char *value,
++ 			     struct lxc_conf *lxc_conf, void *data)
++ {
++@@ -3770,6 +3796,12 @@ static int get_config_tty_max(const char *key, char *retv, int inlen,
++ 	return lxc_get_conf_size_t(c, retv, inlen, c->ttys.max);
++ }
++ 
+++static int get_config_tty_min(const char *key, char *retv, int inlen,
+++			      struct lxc_conf *c, void *data)
+++{
+++	return lxc_get_conf_size_t(c, retv, inlen, c->ttys.min);
+++}
+++
++ static int get_config_tty_dir(const char *key, char *retv, int inlen,
++ 			     struct lxc_conf *c, void *data)
++ {
++@@ -4822,6 +4854,13 @@ static inline int clr_config_tty_max(const char *key, struct lxc_conf *c,
++ 	return 0;
++ }
++ 
+++static inline int clr_config_tty_min(const char *key, struct lxc_conf *c,
+++				     void *data)
+++{
+++	c->ttys.min = 0;
+++	return 0;
+++}
+++
++ static inline int clr_config_tty_dir(const char *key, struct lxc_conf *c,
++ 				    void *data)
++ {
++diff --git a/src/lxc/terminal.c b/src/lxc/terminal.c
++index d066c2b9e..84a47d99f 100644
++--- a/src/lxc/terminal.c
+++++ b/src/lxc/terminal.c
++@@ -640,7 +640,7 @@ int lxc_terminal_allocate(struct lxc_conf *conf, int sockfd, int *ttyreq)
++ 	}
++ 
++ 	if (*ttyreq > 0) {
++-		if ((size_t)*ttyreq > ttys->max)
+++		if ((size_t)*ttyreq <= ttys->min || (size_t)*ttyreq > ttys->max)
++ 			goto out;
++ 
++ 		if (ttys->tty[*ttyreq - 1].busy >= 0)
++@@ -652,7 +652,7 @@ int lxc_terminal_allocate(struct lxc_conf *conf, int sockfd, int *ttyreq)
++ 	}
++ 
++ 	/* Search for next available tty, fixup index tty1 => [0]. */
++-	for (ttynum = 1; ttynum <= ttys->max && ttys->tty[ttynum - 1].busy >= 0; ttynum++) {
+++	for (ttynum = ttys->min + 1; ttynum <= ttys->max && ttys->tty[ttynum - 1].busy >= 0; ttynum++) {
++ 		;
++ 	}
++ 
++@@ -675,7 +675,7 @@ void lxc_terminal_free(struct lxc_conf *conf, int fd)
++ 	struct lxc_tty_info *ttys = &conf->ttys;
++ 	struct lxc_terminal *terminal = &conf->console;
++ 
++-	for (size_t i = 0; i < ttys->max; i++)
+++	for (size_t i = ttys->min; i < ttys->max; i++)
++ 		if (ttys->tty[i].busy == fd)
++ 			ttys->tty[i].busy = -1;
++ 
+diff --git a/patches/lxc-6.0.6/series b/patches/lxc-6.0.6/series
+new file mode 100644
+index 000000000..dd5483236
+--- /dev/null
++++ b/patches/lxc-6.0.6/series
+@@ -0,0 +1,2 @@
++# Empty on purpose: without a series file PTXdist would apply every patch
++# here. The Pantavisor patches are in series.pantavisor (LXC_SERIES).
+diff --git a/patches/lxc-6.0.6/series.pantavisor b/patches/lxc-6.0.6/series.pantavisor
+new file mode 100644
+index 000000000..2940da3b5
+--- /dev/null
++++ b/patches/lxc-6.0.6/series.pantavisor
+@@ -0,0 +1,15 @@
++# Selected by LXC_SERIES when PANTAVISOR is enabled. From
++# github.com/pantavisor/lxc (stable-6.0, bfa6810a), rebased onto 6.0.6;
++# the pv_export.h header and the rebase notes are left out.
++0001-Add-set_container_type-API-for-Pantavisor.patch
++0002-Add-lxc.rootfs.bdev_type-config-key.patch
++0003-Add-realpath_x-for-virtual-root-path-resolution.patch
++0004-add-origin-mkdir-mount-option-for-source-directory-c.patch
++0005-enhance-lxc_string_split_quoted-to-handle-escaped-ch.patch
++0006-change-cgroup-prefix-from-lxc.payload.-to-lxc.patch
++0007-support-hook-commands-with-parameters.patch
++0008-allow-overlay-mount-entries-with-upper-workdir-outsi.patch
++0009-support-exports-mounts-for-Pantavisor.patch
++0010-block-SIGCHLD-in-run_buffer-to-prevent-child-reaping.patch
++0011-conf-match-pivot_root-mount-propagation-in-lxc_chroo.patch
++0012-confile-add-lxc.tty.min-as-lower-bound-of-tty-alloca.patch
+diff --git a/rules/lxc.in b/rules/lxc.in
+index 5bc1aa813..b4bb431c4 100644
+--- a/rules/lxc.in
++++ b/rules/lxc.in
+@@ -37,4 +37,11 @@ config LXC_TEST_TOOLS
+ 	help
+ 	  Turn on to enable building the lxc test applications
+ 
++# The Pantavisor patches are in series.pantavisor; every other build
++# applies the empty series.
++config LXC_SERIES
++	string
++	default "series.pantavisor" if PANTAVISOR
++	default "series"
++
+ endif
+-- 
+2.43.0
+

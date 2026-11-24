@@ -1,0 +1,377 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Sat, 17 Jan 2026 13:23:21 +0000
+Subject: [PATCH] Add realpath_x() for virtual root path resolution
+
+Add custom realpath implementation that resolves symlinks within a
+virtual root directory. This is essential for handling mount targets
+that are symlinks pointing within the container rootfs.
+
+Based on FreeBSD realpath, modified to:
+- Resolve paths relative to a root directory
+- Keep symlink resolution within the root boundary
+- Not require final target to exist (for create=dir/file)
+---
+ src/lxc/conf.c       |  20 +++-
+ src/lxc/meson.build  |   2 +
+ src/lxc/realpath_x.c | 259 +++++++++++++++++++++++++++++++++++++++++++
+ src/lxc/realpath_x.h |  19 ++++
+ 4 files changed, 298 insertions(+), 2 deletions(-)
+ create mode 100644 src/lxc/realpath_x.c
+ create mode 100644 src/lxc/realpath_x.h
+
+diff --git a/src/lxc/conf.c b/src/lxc/conf.c
+index 4a5ab4cfa..6a135ca53 100644
+--- a/src/lxc/conf.c
++++ b/src/lxc/conf.c
+@@ -56,6 +56,7 @@
+ #include "open_utils.h"
+ #include "parse.h"
+ #include "process_utils.h"
++#include "realpath_x.h"
+ #include "ringbuf.h"
+ #include "start.h"
+ #include "storage/storage.h"
+@@ -2399,6 +2400,8 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
+ {
+ 	__do_free char *mntdata = NULL;
+ 	char *rootfs_path = NULL;
++	char resolved_path[PATH_MAX];
++	const char *mount_path;
+ 	int ret;
+ 	bool dev, optional, relative;
+ 	struct lxc_mount_options opts = {};
+@@ -2410,7 +2413,20 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
+ 	if (rootfs && rootfs->path)
+ 		rootfs_path = rootfs->mount;
+ 
+-	ret = mount_entry_create_dir_file(mntent, path, rootfs, lxc_name,
++	/* Resolve symlinks in mount target path relative to rootfs */
++	mount_path = path;
++	if (rootfs_path) {
++		size_t rootfs_len = strlen(rootfs_path);
++		if (strncmp(path, rootfs_path, rootfs_len) == 0) {
++			char *resolved = realpath_x(rootfs_path, path + rootfs_len, resolved_path);
++			if (resolved) {
++				mount_path = resolved;
++				TRACE("Resolved mount path: %s -> %s", path, mount_path);
++			}
++		}
++	}
++
++	ret = mount_entry_create_dir_file(mntent, mount_path, rootfs, lxc_name,
+ 					  lxc_path);
+ 	if (ret < 0) {
+ 		if (optional)
+@@ -2438,7 +2454,7 @@ static inline int mount_entry_on_generic(struct mntent *mntent,
+ 		return -1;
+ 
+ 	ret = mount_entry(mntent->mnt_fsname,
+-			  path,
++			  mount_path,
+ 			  mntent->mnt_type,
+ 			  opts.mnt_flags,
+ 			  opts.prop_flags,
+diff --git a/src/lxc/meson.build b/src/lxc/meson.build
+index dfb164558..13f737295 100644
+--- a/src/lxc/meson.build
++++ b/src/lxc/meson.build
+@@ -120,6 +120,8 @@ liblxc_sources = files(
+     'process_utils.h',
+     'rexec.c',
+     'rexec.h',
++    'realpath_x.c',
++    'realpath_x.h',
+     'ringbuf.c',
+     'ringbuf.h',
+     'rtnl.c',
+diff --git a/src/lxc/realpath_x.c b/src/lxc/realpath_x.c
+new file mode 100644
+index 000000000..3961bb909
+--- /dev/null
++++ b/src/lxc/realpath_x.c
+@@ -0,0 +1,259 @@
++/* SPDX-License-Identifier: LGPL-2.1+ */
++
++/*
++ * Pantacor realpath_x - resolve paths relative to a virtual root
++ *
++ * Based on FreeBSD realpath implementation:
++ * Copyright (c) 2003 Constantin S. Svintsoff <kostik@iclub.nsu.ru>
++ *
++ * Pantavisor modifications:
++ * Copyright (c) 2020 Pantacor Ltd
++ * Author: Alexander Sack <asac@pantacor.com>
++ */
++
++#include "config.h"
++
++#include <errno.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/param.h>
++#include <sys/stat.h>
++#include <unistd.h>
++
++#include "log.h"
++
++lxc_log_define(realpath_x, lxc);
++
++static size_t pv_strlcpy(char *dst, const char *src, size_t dsize)
++{
++	const char *osrc = src;
++	size_t nleft = dsize;
++
++	if (nleft != 0) {
++		while (--nleft != 0) {
++			if ((*dst++ = *src++) == '\0')
++				break;
++		}
++	}
++
++	if (nleft == 0) {
++		if (dsize != 0)
++			*dst = '\0';
++		while (*src++)
++			;
++	}
++
++	return (src - osrc - 1);
++}
++
++static size_t pv_strlcat(char *dst, const char *src, size_t siz)
++{
++	char *d = dst;
++	const char *s = src;
++	size_t n = siz;
++	size_t dlen;
++
++	while (n-- != 0 && *d != '\0')
++		d++;
++	dlen = d - dst;
++	n = siz - dlen;
++
++	if (n == 0)
++		return (dlen + strlen(s));
++	while (*s != '\0') {
++		if (n != 1) {
++			*d++ = *s;
++			n--;
++		}
++		s++;
++	}
++	*d = '\0';
++
++	return (dlen + (s - src));
++}
++
++/*
++ * Find the real name of path relative to root, by removing all ".", ".."
++ * and symlink components. Unlike standard realpath, this does not require
++ * the final target to exist, and all symlink resolution stays within root.
++ */
++char *realpath_x(const char *root, const char *path, char *resolved)
++{
++	struct stat sb;
++	char *p, *q, *s;
++	size_t left_len, resolved_len;
++	unsigned symlinks;
++	int m, slen;
++	char left[PATH_MAX], next_token[PATH_MAX], symlink[PATH_MAX];
++	char root_path[PATH_MAX];
++	size_t root_len;
++
++	TRACE("realpath_x: root=%s path=%s", root ? root : "(null)", path ? path : "(null)");
++
++	if (path == NULL) {
++		errno = EINVAL;
++		return NULL;
++	}
++	if (path[0] == '\0') {
++		errno = ENOENT;
++		return NULL;
++	}
++	if (resolved == NULL) {
++		resolved = malloc(PATH_MAX);
++		if (resolved == NULL)
++			return NULL;
++		m = 1;
++	} else {
++		m = 0;
++	}
++	if (root == NULL) {
++		errno = EINVAL;
++		if (m)
++			free(resolved);
++		return NULL;
++	}
++
++	pv_strlcpy(root_path, root, sizeof(root_path));
++	root_len = strlen(root_path);
++	if (root_path[root_len - 1] != '/') {
++		root_path[root_len] = '/';
++		root_len++;
++		root_path[root_len] = '\0';
++	}
++
++	symlinks = 0;
++	if (path[0] == '/') {
++		pv_strlcpy(resolved, root_path, PATH_MAX);
++		if (path[1] == '\0')
++			return resolved;
++		resolved_len = root_len;
++		left_len = pv_strlcpy(left, path + 1, sizeof(left));
++	} else {
++		pv_strlcpy(resolved, root_path, PATH_MAX);
++		resolved_len = strlen(resolved);
++		left_len = pv_strlcpy(left, path, sizeof(left));
++	}
++
++	if (left_len >= sizeof(left) || resolved_len >= PATH_MAX) {
++		if (m)
++			free(resolved);
++		errno = ENAMETOOLONG;
++		return NULL;
++	}
++
++	while (left_len != 0) {
++		p = strchr(left, '/');
++		s = p ? p : left + left_len;
++		if ((size_t)(s - left) >= sizeof(next_token)) {
++			if (m)
++				free(resolved);
++			errno = ENAMETOOLONG;
++			return NULL;
++		}
++		memcpy(next_token, left, s - left);
++		next_token[s - left] = '\0';
++		left_len -= s - left;
++		if (p != NULL)
++			memmove(left, s + 1, left_len + 1);
++
++		if (resolved[resolved_len - 1] != '/') {
++			if (resolved_len + 1 >= PATH_MAX) {
++				if (m)
++					free(resolved);
++				errno = ENAMETOOLONG;
++				return NULL;
++			}
++			resolved[resolved_len++] = '/';
++			resolved[resolved_len] = '\0';
++		}
++
++		if (next_token[0] == '\0') {
++			if (lstat(resolved, &sb) == 0 && !S_ISDIR(sb.st_mode)) {
++				if (m)
++					free(resolved);
++				errno = ENOTDIR;
++				return NULL;
++			}
++			continue;
++		} else if (strcmp(next_token, ".") == 0) {
++			continue;
++		} else if (strcmp(next_token, "..") == 0) {
++			if (resolved_len > root_len) {
++				resolved[resolved_len - 1] = '\0';
++				q = strrchr(resolved, '/') + 1;
++				*q = '\0';
++				resolved_len = q - resolved;
++			}
++			continue;
++		}
++
++		resolved_len = pv_strlcat(resolved, next_token, PATH_MAX);
++		if (resolved_len >= PATH_MAX) {
++			if (m)
++				free(resolved);
++			errno = ENAMETOOLONG;
++			return NULL;
++		}
++
++		if (lstat(resolved, &sb) != 0) {
++			/* Target doesn't exist yet - that's OK for create=dir/file */
++			continue;
++		}
++
++		if (S_ISLNK(sb.st_mode)) {
++			if (symlinks++ > MAXSYMLINKS) {
++				if (m)
++					free(resolved);
++				errno = ELOOP;
++				return NULL;
++			}
++			slen = readlink(resolved, symlink, sizeof(symlink) - 1);
++			if (slen < 0) {
++				if (m)
++					free(resolved);
++				return NULL;
++			}
++			symlink[slen] = '\0';
++
++			if (symlink[0] == '/') {
++				/* Absolute symlink - reset to root */
++				resolved[root_len] = '\0';
++				resolved_len = root_len;
++			} else if (resolved_len > root_len) {
++				/* Relative symlink - strip last component */
++				resolved[resolved_len - 1] = '\0';
++				q = strrchr(resolved, '/') + 1;
++				*q = '\0';
++				resolved_len = q - resolved;
++			}
++
++			if (p != NULL) {
++				if (symlink[slen - 1] != '/') {
++					if ((size_t)(slen + 1) >= sizeof(symlink)) {
++						if (m)
++							free(resolved);
++						errno = ENAMETOOLONG;
++						return NULL;
++					}
++					symlink[slen] = '/';
++					symlink[slen + 1] = '\0';
++				}
++				left_len = pv_strlcat(symlink, left, sizeof(symlink));
++				if (left_len >= sizeof(left)) {
++					if (m)
++						free(resolved);
++					errno = ENAMETOOLONG;
++					return NULL;
++				}
++			}
++			left_len = pv_strlcpy(left, symlink, sizeof(left));
++		}
++	}
++
++	if (resolved_len > 1 && resolved[resolved_len - 1] == '/')
++		resolved[resolved_len - 1] = '\0';
++
++	TRACE("realpath_x: resolved=%s", resolved);
++	return resolved;
++}
+diff --git a/src/lxc/realpath_x.h b/src/lxc/realpath_x.h
+new file mode 100644
+index 000000000..718470fce
+--- /dev/null
++++ b/src/lxc/realpath_x.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: LGPL-2.1+ */
++
++/*
++ * Pantacor realpath_x - resolve paths relative to a virtual root
++ *
++ * Copyright (c) 2020 Pantacor Ltd
++ * Author: Alexander Sack <asac@pantacor.com>
++ */
++
++#ifndef __LXC_REALPATH_X_H
++#define __LXC_REALPATH_X_H
++
++/*
++ * Resolve path relative to root, handling symlinks within the virtual root.
++ * Unlike standard realpath(), this does not require the final target to exist.
++ */
++char *realpath_x(const char *root, const char *path, char *resolved);
++
++#endif /* __LXC_REALPATH_X_H */

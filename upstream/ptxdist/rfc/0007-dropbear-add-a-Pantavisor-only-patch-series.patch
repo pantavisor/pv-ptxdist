@@ -1,7 +1,7 @@
 From d6221b0b6736a45477dc978e3d07be0c97d79997 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 10:28:06 -0300
-Subject: [RFC PATCH 8/8] dropbear: add a Pantavisor-only patch series
+Subject: [RFC PATCH 7/8] dropbear: add a Pantavisor-only patch series
 
 Pantavisor runs dropbear in its initramfs as a debug SSH server:
 
