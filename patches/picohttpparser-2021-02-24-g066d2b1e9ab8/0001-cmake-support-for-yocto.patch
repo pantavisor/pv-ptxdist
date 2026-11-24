@@ -3,6 +3,7 @@ From: Alexander Sack <asac@pantacor.com>
 Date: Thu, 20 Apr 2023 04:06:39 -0400
 Subject: [PATCH] cmake support for yocto
 
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  CMakeLists.txt | 15 +++++++++++++++
  1 file changed, 15 insertions(+)

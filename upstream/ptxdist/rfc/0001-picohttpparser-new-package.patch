@@ -1,4 +1,4 @@
-From c7c6805408f16dceea0deef8884b21a555661feb Mon Sep 17 00:00:00 2001
+From 113d80dbf4b18c5008a2d501406d1c0355664f62 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 15:42:56 -0300
 Subject: [RFC PATCH 1/8] picohttpparser: new package
@@ -14,11 +14,11 @@ installed on the target.
 
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
- .../0001-cmake-support-for-yocto.patch        | 31 ++++++++++++
+ .../0001-cmake-support-for-yocto.patch        | 32 ++++++++++++
  .../series                                    |  3 ++
  rules/picohttpparser.in                       |  9 ++++
  rules/picohttpparser.make                     | 50 +++++++++++++++++++
- 4 files changed, 93 insertions(+)
+ 4 files changed, 94 insertions(+)
  create mode 100644 patches/picohttpparser-2021-02-24-g066d2b1e9ab8/0001-cmake-support-for-yocto.patch
  create mode 100644 patches/picohttpparser-2021-02-24-g066d2b1e9ab8/series
  create mode 100644 rules/picohttpparser.in
@@ -26,15 +26,16 @@ Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 
 diff --git a/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/0001-cmake-support-for-yocto.patch b/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/0001-cmake-support-for-yocto.patch
 new file mode 100644
-index 000000000..a4b138158
+index 000000000..2fea14b35
 --- /dev/null
 +++ b/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/0001-cmake-support-for-yocto.patch
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,32 @@
 +From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 +From: Alexander Sack <asac@pantacor.com>
 +Date: Thu, 20 Apr 2023 04:06:39 -0400
 +Subject: [PATCH] cmake support for yocto
 +
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 +---
 + CMakeLists.txt | 15 +++++++++++++++
 + 1 file changed, 15 insertions(+)
