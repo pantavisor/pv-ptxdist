@@ -1,4 +1,4 @@
-From 1fc4b6c9eb14d274f42e0df17a64437ff574b88a Mon Sep 17 00:00:00 2001
+From d6221b0b6736a45477dc978e3d07be0c97d79997 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 10:28:06 -0300
 Subject: [RFC PATCH 7/8] dropbear: add a Pantavisor-only patch series
@@ -251,7 +251,7 @@ index 000000000..00650bee4
 +# Any-user mode (-n), forward-ported from github.com/pantacor/dropbear-pv
 +0200-svr-add-n-any-user-mode-with-a-single-authorized_key.patch
 diff --git a/rules/dropbear.in b/rules/dropbear.in
-index 95beb09bf..4b00c65d5 100644
+index ca4640682..b3b38f1ea 100644
 --- a/rules/dropbear.in
 +++ b/rules/dropbear.in
 @@ -423,6 +423,13 @@ config DROPBEAR_SCP
@@ -267,7 +267,7 @@ index 95beb09bf..4b00c65d5 100644
 +
  comment "Runtime options                ---"
  
- config DROPBEAR_STARTSCRIPT
+ config DROPBEAR_GENKEYS
 -- 
 2.43.0
 
