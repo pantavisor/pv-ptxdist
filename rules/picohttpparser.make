@@ -15,8 +15,7 @@ PACKAGES-$(PTXCONF_PICOHTTPPARSER) += picohttpparser
 # Paths and names
 #
 # Upstream has no releases. The revision meta-pantavisor builds; its
-# github.com/pantavisor/picohttpparser fork adds only the CMake build
-# (patches/).
+# github.com/pantavisor/picohttpparser fork adds only a CMake build.
 PICOHTTPPARSER_VERSION	:= 2021-02-24-g066d2b1e9ab8
 PICOHTTPPARSER_SHA256	:= 63144ca669204315e62a7abc23a1f487375dc3fe4d9ebbd694a6706a09d9e535
 PICOHTTPPARSER		:= picohttpparser-$(PICOHTTPPARSER_VERSION)
@@ -32,12 +31,36 @@ PICOHTTPPARSER_LICENSE_FILES := \
 # Prepare
 # ----------------------------------------------------------------------------
 
-# Static library linked into Pantavisor's executables and its pv_lxc.so
-# plugin, hence PIC.
-PICOHTTPPARSER_CONF_TOOL	:= cmake
-PICOHTTPPARSER_CONF_OPT		:= \
-	$(CROSS_CMAKE_USR) \
-	-DCMAKE_POSITION_INDEPENDENT_CODE=ON
+# Upstream has no build system for the library (its Makefile only builds the
+# tests) and expects users to copy picohttpparser.{c,h}. Build the static
+# library here instead of carrying a build system as a patch.
+PICOHTTPPARSER_CONF_TOOL	:= NO
+
+# ----------------------------------------------------------------------------
+# Compile
+# ----------------------------------------------------------------------------
+
+# PIC: Pantavisor links it into its executables and its pv_lxc.so plugin.
+# -O2 -DNDEBUG as CMake's RelWithDebInfo; the wrapper adds -g.
+$(STATEDIR)/picohttpparser.compile:
+	@$(call targetinfo)
+	@$(call world/execute, PICOHTTPPARSER, \
+		$(CROSS_CC) -O2 -DNDEBUG -fPIC -c picohttpparser.c -o picohttpparser.o && \
+		$(CROSS_AR) rcs libpicohttpparser.a picohttpparser.o)
+	@$(call touch)
+
+# ----------------------------------------------------------------------------
+# Install
+# ----------------------------------------------------------------------------
+
+$(STATEDIR)/picohttpparser.install:
+	@$(call targetinfo)
+	@$(call world/execute, PICOHTTPPARSER, \
+		install -D -m 0644 picohttpparser.h \
+			$(PICOHTTPPARSER_PKGDIR)/usr/include/picohttpparser.h && \
+		install -D -m 0644 libpicohttpparser.a \
+			$(PICOHTTPPARSER_PKGDIR)/usr/lib/libpicohttpparser.a)
+	@$(call touch)
 
 # ----------------------------------------------------------------------------
 # Target-Install

@@ -1,4 +1,4 @@
-From 8dfc1ef48002cec9749029f36294ed5023e215c9 Mon Sep 17 00:00:00 2001
+From bafc94e497f22fb9cba253b829625fe276fdda3c Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 15:44:38 -0300
 Subject: [RFC PATCH 2/8] libthttp: new package

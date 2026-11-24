@@ -1,97 +1,47 @@
-From 113d80dbf4b18c5008a2d501406d1c0355664f62 Mon Sep 17 00:00:00 2001
+From 186270f0c7b46fc9b4e467d229110912c89d0d03 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
-Date: Tue, 24 Nov 2026 15:42:56 -0300
+Date: Tue, 24 Nov 2026 15:56:20 -0300
 Subject: [RFC PATCH 1/8] picohttpparser: new package
 
 picohttpparser is the HTTP request and response parser from h2o.
-Pantavisor uses it. Upstream has no releases and no build system, so
-take the revision Pantavisor's fork is based on (066d2b1) and the
-fork's CMake build as a patch; the fork has no other change.
+Pantavisor uses it. Upstream has no releases, so take the revision
+Pantavisor's fork is based on (066d2b1).
 
-It is built as a static library with position-independent code, as
-Pantavisor links it into its executables and a plugin, and nothing is
-installed on the target.
+Upstream has no build system for the library either: its Makefile only
+builds the tests, and the README expects users to copy
+picohttpparser.{c,h}. The rule builds the static library itself, with
+position-independent code, as Pantavisor links it into its executables
+and a plugin, and with -O2 -DNDEBUG as a CMake release build would.
+Nothing is installed on the target.
 
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
- .../0001-cmake-support-for-yocto.patch        | 32 ++++++++++++
- .../series                                    |  3 ++
- rules/picohttpparser.in                       |  9 ++++
- rules/picohttpparser.make                     | 50 +++++++++++++++++++
- 4 files changed, 94 insertions(+)
- create mode 100644 patches/picohttpparser-2021-02-24-g066d2b1e9ab8/0001-cmake-support-for-yocto.patch
- create mode 100644 patches/picohttpparser-2021-02-24-g066d2b1e9ab8/series
+ rules/picohttpparser.in   |  8 +++++
+ rules/picohttpparser.make | 73 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 81 insertions(+)
  create mode 100644 rules/picohttpparser.in
  create mode 100644 rules/picohttpparser.make
 
-diff --git a/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/0001-cmake-support-for-yocto.patch b/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/0001-cmake-support-for-yocto.patch
-new file mode 100644
-index 000000000..2fea14b35
---- /dev/null
-+++ b/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/0001-cmake-support-for-yocto.patch
-@@ -0,0 +1,32 @@
-+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-+From: Alexander Sack <asac@pantacor.com>
-+Date: Thu, 20 Apr 2023 04:06:39 -0400
-+Subject: [PATCH] cmake support for yocto
-+
-+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
-+---
-+ CMakeLists.txt | 15 +++++++++++++++
-+ 1 file changed, 15 insertions(+)
-+ create mode 100644 CMakeLists.txt
-+
-+diff --git a/CMakeLists.txt b/CMakeLists.txt
-+new file mode 100644
-+index 0000000..a7cc85d
-+--- /dev/null
-++++ b/CMakeLists.txt
-+@@ -0,0 +1,15 @@
-++cmake_minimum_required(VERSION 3.10)
-++
-++project(picohttpparser)
-++
-++set(CMAKE_CXX_STANDARD 17)
-++set(CMAKE_CXX_STANDARD_REQUIRED True)
-++
-++add_library(picohttpparser STATIC  picohttpparser.c)
-++
-++install(TARGETS picohttpparser
-++        LIBRARY DESTINATION lib)
-++
-++install(FILES picohttpparser.h
-++        DESTINATION include)
-++
-diff --git a/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/series b/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/series
-new file mode 100644
-index 000000000..99fa20957
---- /dev/null
-+++ b/patches/picohttpparser-2021-02-24-g066d2b1e9ab8/series
-@@ -0,0 +1,3 @@
-+# picohttpparser has no build system; this one is from
-+# github.com/pantavisor/picohttpparser (pv/master)
-+0001-cmake-support-for-yocto.patch
 diff --git a/rules/picohttpparser.in b/rules/picohttpparser.in
 new file mode 100644
-index 000000000..22f29612d
+index 000000000..7ccbe3bc1
 --- /dev/null
 +++ b/rules/picohttpparser.in
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,8 @@
 +## SECTION=system_libraries
 +
 +config PICOHTTPPARSER
 +	tristate
 +	prompt "picohttpparser"
-+	select HOST_CMAKE
 +	help
 +	  Tiny HTTP request/response parser, used by Pantavisor. Built as
 +	  a static library only, so nothing is installed on the target.
 diff --git a/rules/picohttpparser.make b/rules/picohttpparser.make
 new file mode 100644
-index 000000000..71a27fd27
+index 000000000..635f1c849
 --- /dev/null
 +++ b/rules/picohttpparser.make
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,73 @@
 +# -*-makefile-*-
 +#
 +# Copyright (C) 2026 by Fernando Luiz Cola <fernando.luiz@pantacor.com>
@@ -109,8 +59,7 @@ index 000000000..71a27fd27
 +# Paths and names
 +#
 +# Upstream has no releases. The revision meta-pantavisor builds; its
-+# github.com/pantavisor/picohttpparser fork adds only the CMake build
-+# (patches/).
++# github.com/pantavisor/picohttpparser fork adds only a CMake build.
 +PICOHTTPPARSER_VERSION	:= 2021-02-24-g066d2b1e9ab8
 +PICOHTTPPARSER_SHA256	:= 63144ca669204315e62a7abc23a1f487375dc3fe4d9ebbd694a6706a09d9e535
 +PICOHTTPPARSER		:= picohttpparser-$(PICOHTTPPARSER_VERSION)
@@ -126,12 +75,36 @@ index 000000000..71a27fd27
 +# Prepare
 +# ----------------------------------------------------------------------------
 +
-+# Static library linked into Pantavisor's executables and its pv_lxc.so
-+# plugin, hence PIC.
-+PICOHTTPPARSER_CONF_TOOL	:= cmake
-+PICOHTTPPARSER_CONF_OPT		:= \
-+	$(CROSS_CMAKE_USR) \
-+	-DCMAKE_POSITION_INDEPENDENT_CODE=ON
++# Upstream has no build system for the library (its Makefile only builds the
++# tests) and expects users to copy picohttpparser.{c,h}. Build the static
++# library here instead of carrying a build system as a patch.
++PICOHTTPPARSER_CONF_TOOL	:= NO
++
++# ----------------------------------------------------------------------------
++# Compile
++# ----------------------------------------------------------------------------
++
++# PIC: Pantavisor links it into its executables and its pv_lxc.so plugin.
++# -O2 -DNDEBUG as CMake's RelWithDebInfo; the wrapper adds -g.
++$(STATEDIR)/picohttpparser.compile:
++	@$(call targetinfo)
++	@$(call world/execute, PICOHTTPPARSER, \
++		$(CROSS_CC) -O2 -DNDEBUG -fPIC -c picohttpparser.c -o picohttpparser.o && \
++		$(CROSS_AR) rcs libpicohttpparser.a picohttpparser.o)
++	@$(call touch)
++
++# ----------------------------------------------------------------------------
++# Install
++# ----------------------------------------------------------------------------
++
++$(STATEDIR)/picohttpparser.install:
++	@$(call targetinfo)
++	@$(call world/execute, PICOHTTPPARSER, \
++		install -D -m 0644 picohttpparser.h \
++			$(PICOHTTPPARSER_PKGDIR)/usr/include/picohttpparser.h && \
++		install -D -m 0644 libpicohttpparser.a \
++			$(PICOHTTPPARSER_PKGDIR)/usr/lib/libpicohttpparser.a)
++	@$(call touch)
 +
 +# ----------------------------------------------------------------------------
 +# Target-Install

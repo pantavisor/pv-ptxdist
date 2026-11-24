@@ -227,8 +227,13 @@ after the pantavisor package.
 | 8/8 | dropbear: Pantavisor-only patch series | written (`0008-*`); needs the GENKEYS patch |
 
 - [x] **picohttpparser**: upstream h2o/picohttpparser at 066d2b1 (what
-      the Pantavisor fork is based on) plus the fork's CMake build as a
-      patch; the fork has no other change.
+      the Pantavisor fork is based on). Upstream has no build system for
+      the library, so the rule compiles `picohttpparser.c` into a static,
+      PIC `libpicohttpparser.a` itself (`-O2 -DNDEBUG`, as the fork's
+      CMake release build did), instead of carrying that CMake build as a
+      patch. Built in Docker, qemu-arm64 boots and reaches Pantahub.
+      Later, Pantavisor could compile picohttpparser.c itself, as
+      upstream's README suggests, and the package would go.
 - [ ] **libthttp**: depends on mbedtls. It downloads NSS `certdata.txt`
       as a second part to install only `LIBTHTTP_CA_CERTS`; upstream may
       prefer an option in PTXdist's ca-certificates package to install
