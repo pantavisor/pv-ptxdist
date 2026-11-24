@@ -13,8 +13,8 @@ Patches are based on PTXdist `master`, not on a release.
 | Package | In this layer | Upstream form |
 |---|---|---|
 | mbedtls | Stock package, rule bumped to 2.28.10 (`rules/mbedtls.make`) | PTXdist patch to write |
-| dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | PTXdist patch to write for `DROPBEAR_GENKEYS`; the `-n` patch stays in this layer |
-| busybox | Stock 1.38.0 + 6 Pantavisor patches | Not upstreamed for now; all patches stay in this layer |
+| dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | PTXdist patch to write for `DROPBEAR_GENKEYS`; the `-n` patch goes in the RFC, applied only with Pantavisor (`DROPBEAR_SERIES`) |
+| busybox | Stock 1.38.0 + 6 Pantavisor patches | In the RFC, applied only with Pantavisor (`BUSYBOX_SERIES`) |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
 | lxc | `lxc6-pv` (LXC 6 fork, `bfa6810a`); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump PTXdist's lxc 3.0.1 to 6.0.x (meson) plus 11 fork patches; see section 3 |
 | libevent | Still `libevent-pv` 2.2.1-alpha | Blocked |
@@ -31,24 +31,35 @@ Patches are based on PTXdist `master`, not on a release.
       `rules/dropbear.{in,make,postinst}` and PTXdist's. The postinst guard
       matches openssh's. Without it, enabling dropbear selects INITMETHOD,
       whose default is systemd.
-- **dropbear `-n` any-user mode stays in this layer**
-      (`patches/dropbear-2026.94/0200-*`), not offered to dropbear
-      upstream. It serves Pantavisor's debug SSH, where the user name picks
-      the container the forced command enters; nothing else uses it.
 - [x] **busybox: fix the `mdev -s` crash first.** `0304` (MODALIAS) passed
       a NULL device name to `regexec()` for PCI devices without `DEVNAME`
       as soon as `mdev.conf` had a device-name rule. `0305` skips name
       rules for those devices; tested natively and on qemu-arm64.
-- **busybox: not upstreamed for now.** All Pantavisor patches (0300-0305:
-      nsenter `--caps` and `-C`, mdev `FOLLOW_X_ROOT`/`MDEV_CONF`, netlink
-      `nl_pid`, MODALIAS and its fix) and `rules/busybox-pantavisor.in`
-      stay in this layer. A layer's `patches/busybox-<version>/` replaces
-      PTXdist's, so this layer keeps PTXdist's whole series plus 0300-0305,
-      and re-checks it on every busybox bump. The series is cleaned up
-      (`-F` is a flag again, `-c` is documented, nsenter links without
-      setpriv/run-init, `chdir()`/`chroot()` are checked when following the
-      root, no warnings beyond stock 1.38.0's, every patch builds on its
-      own) in case it is sent later.
+- **busybox and dropbear `-n`: Pantavisor-only patch series.** The
+      Pantavisor patches are not sent as stand-alone patches. Each package
+      has two series files next to its patches: `series` (PTXdist's,
+      unchanged; empty for dropbear, which has no patches upstream) and
+      `series.pantavisor` (the same plus busybox 0300-0305, or dropbear
+      `0200`). Hidden `BUSYBOX_SERIES` and `DROPBEAR_SERIES` symbols
+      default to `series.pantavisor` if PANTAVISOR, else `series`; PTXdist
+      reads `PTXCONF_<PKG>_SERIES` for every package, as it does for
+      `KERNEL_SERIES`. Checked with `ptxdist extract`: with Pantavisor,
+      busybox gets 0200-0203 and 0300-0305 and dropbear gets `0200`;
+      without it, busybox gets 0200-0203 and dropbear nothing.
+      `BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT` now depends on PANTAVISOR. The
+      RFC patches are written on PTXdist master (d6b2c7954) and apply with
+      `git am`: `upstream/ptxdist/rfc/0006-busybox-*.patch` and
+      `0007-dropbear-*.patch`. They put the series files into PTXdist's
+      `patches/busybox-1.38.0/` and a new `patches/dropbear-2026.94/`, and
+      the symbols into `rules/busybox.in` and `rules/dropbear.in`.
+      `FOLLOW_X_ROOT` goes into `rules/busybox.in` too, not
+      `config/busybox`, which mirrors stock busybox's Kconfig and is
+      regenerated on every bump. Then `rules/busybox-pantavisor.in` goes. Until then the layer's
+      `patches/busybox-1.38.0/` still replaces PTXdist's, so re-check it on
+      every busybox bump. The series is cleaned up (`-F` is a flag again,
+      `-c` is documented, nsenter links without setpriv/run-init,
+      `chdir()`/`chroot()` are checked when following the root, no
+      warnings beyond stock 1.38.0's, every patch builds on its own).
 - [x] **lxc: version bump 3.0.1 -> 6.0.6.** Written on PTXdist master
       (4da61501e): `upstream/ptxdist/0001-lxc-version-bump-3.0.1-6.0.6.patch`.
       Meson, every option pinned (`configure_helper.py` shows no
@@ -232,6 +243,10 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
   `INITMETHOD` choice, or a standalone initramfs package.
 - mbed TLS 2.28 LTS is end-of-life. Should Pantavisor and libthttp move to
   mbed TLS 3.x, or to OpenSSL, before upstream depends on them?
+- Pantavisor-only patch series for busybox and dropbear
+  (`series.pantavisor`, chosen by `BUSYBOX_SERIES`/`DROPBEAR_SERIES`):
+  nobody else's build changes, but whoever bumps busybox or dropbear has
+  to rebase them. Acceptable, or should they stay in a layer?
 
 ## Smaller decisions
 

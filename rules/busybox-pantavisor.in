@@ -7,8 +7,16 @@ config BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT
 	bool
 	prompt "busybox mdev: follow switch/pivot root (FOLLOW_X_ROOT)"
 	depends on BUSYBOX_FEATURE_MDEV_DAEMON
+	depends on PANTAVISOR
 	default y
 	help
 	  Needed by Pantavisor's container mdev hook
 	  (hooks_lxc-mount.d/mdev.sh), which runs a per-container
 	  mdev daemon inside the container's mount namespace.
+
+# Upstream this belongs in rules/busybox.in. Hidden, so the series follows
+# PANTAVISOR: builds without it get PTXdist's busybox patches only.
+config BUSYBOX_SERIES
+	string
+	default "series.pantavisor" if PANTAVISOR
+	default "series"

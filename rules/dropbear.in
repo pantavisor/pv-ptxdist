@@ -436,6 +436,13 @@ config DROPBEAR_GENKEYS
 	  started with -R, which creates missing host keys on the first
 	  connection, or when the system has no init method of its own.
 
+# Hidden, so the series follows PANTAVISOR: the -n any-user patch is only
+# applied for Pantavisor's debug SSH.
+config DROPBEAR_SERIES
+	string
+	default "series.pantavisor" if PANTAVISOR
+	default "series"
+
 config DROPBEAR_STARTSCRIPT
 	bool
 	default y

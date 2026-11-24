@@ -14,6 +14,7 @@
 # Pantavisor                    
 #
 PTXCONF_BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT=y
+PTXCONF_BUSYBOX_SERIES="series.pantavisor"
 PTXCONF_LIBEVENT_PV=y
 PTXCONF_LIBEVENT_PV_DEBUG_MODE=y
 PTXCONF_LIBTHTTP=y
@@ -2205,6 +2206,7 @@ PTXCONF_DROPBEAR_DROPBEAR_KEY=y
 # Runtime options                ---
 #
 # PTXCONF_DROPBEAR_GENKEYS is not set
+PTXCONF_DROPBEAR_SERIES="series.pantavisor"
 # PTXCONF_ETHERWAKE is not set
 # PTXCONF_ETHTOOL is not set
 # PTXCONF_FCGI is not set

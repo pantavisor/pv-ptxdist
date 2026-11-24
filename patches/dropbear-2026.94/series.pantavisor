@@ -1,0 +1,3 @@
+# Selected by DROPBEAR_SERIES when PANTAVISOR is enabled.
+# Any-user mode (-n), forward-ported from github.com/pantacor/dropbear-pv
+0200-svr-add-n-any-user-mode-with-a-single-authorized_key.patch
