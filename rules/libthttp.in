@@ -1,4 +1,4 @@
-## SECTION=pantavisor
+## SECTION=system_libraries
 
 config LIBTHTTP
 	tristate

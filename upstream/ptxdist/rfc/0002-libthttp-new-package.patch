@@ -1,0 +1,173 @@
+From 30cf5a1342ff61fde5ee219139272310f027fc35 Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Tue, 24 Nov 2026 15:44:38 -0300
+Subject: [RFC PATCH 2/8] libthttp: new package
+
+libthttp is the small HTTP client Pantavisor uses to talk to Pantahub,
+on top of mbed TLS. Take the revision Pantavisor 031 builds, 76 commits
+after the last tag (011), which adds the certificate denylist 031 uses.
+
+The library is static, with position-independent code, as Pantavisor
+links it into its executables and a plugin. What goes on the target is
+the trust store, /etc/thttp/certs: only the roots in LIBTHTTP_CA_CERTS,
+extracted from ca-certificates' certdata.txt with its certdata2pem.py,
+so that an initramfs does not carry the whole bundle. The default is
+the set meta-pantavisor uses: the roots of Let's Encrypt, DigiCert,
+Sectigo, GlobalSign, Google Trust Services and Amazon. Every file must
+parse with mbed TLS, or Pantavisor refuses the whole directory.
+
+The certificates are MPL-2.0, hence MIT AND MPL-2.0.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ rules/libthttp.in   |  30 +++++++++++++
+ rules/libthttp.make | 100 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 130 insertions(+)
+ create mode 100644 rules/libthttp.in
+ create mode 100644 rules/libthttp.make
+
+diff --git a/rules/libthttp.in b/rules/libthttp.in
+new file mode 100644
+index 000000000..cdfba00ab
+--- /dev/null
++++ b/rules/libthttp.in
+@@ -0,0 +1,30 @@
++## SECTION=system_libraries
++
++config LIBTHTTP
++	tristate
++	prompt "libthttp"
++	select HOST_CMAKE
++	select MBEDTLS
++	select HOST_SYSTEM_PYTHON3
++	help
++	  Tiny HTTP/REST client library used by Pantavisor to talk to
++	  Pantahub. The library itself is static; only the TLS root
++	  certificates are installed on the target.
++
++config LIBTHTTP_CA_CERTS
++	string
++	depends on LIBTHTTP
++	prompt "TLS root certificates"
++	default "ISRG_Root_X1 ISRG_Root_X2 DigiCert_Global_Root_G2 DigiCert_Global_Root_G3 DigiCert_TLS_RSA4096_Root_G5 DigiCert_TLS_ECC_P384_Root_G5 USERTrust_RSA_Certification_Authority USERTrust_ECC_Certification_Authority COMODO_RSA_Certification_Authority COMODO_ECC_Certification_Authority Sectigo_Public_Server_Authentication_Root_R46 Sectigo_Public_Server_Authentication_Root_E46 GlobalSign_Root_CA_-_R3 GlobalSign_Root_CA_-_R6 GlobalSign_ECC_Root_CA_-_R4 GlobalSign_ECC_Root_CA_-_R5 GlobalSign_Root_R46 GlobalSign_Root_E46 GTS_Root_R1 GTS_Root_R3 GTS_Root_R4 Amazon_Root_CA_1 Amazon_Root_CA_2 Amazon_Root_CA_3 Amazon_Root_CA_4"
++	help
++	  Root CAs installed to /etc/thttp/certs, the trust store
++	  Pantavisor uses for HTTPS (PV_LIBTHTTP_CERTSDIR). Names are
++	  certificate labels from the Mozilla list, with spaces as
++	  underscores, as PTXdist's ca-certificates package writes them.
++	  Every file must parse with mbed TLS, or Pantavisor refuses the
++	  whole directory.
++
++	  The default is the roots of Let's Encrypt (ISRG), DigiCert,
++	  Sectigo, GlobalSign, Google Trust Services and Amazon, the same
++	  set as meta-pantavisor's PV_TLS_CA_CERTS. A name missing from
++	  the list is skipped with a warning.
+diff --git a/rules/libthttp.make b/rules/libthttp.make
+new file mode 100644
+index 000000000..a853a5fd5
+--- /dev/null
++++ b/rules/libthttp.make
+@@ -0,0 +1,100 @@
++# -*-makefile-*-
++#
++# Copyright (C) 2026 by Fernando Luiz Cola <fernando.luiz@pantacor.com>
++#
++# For further information about the PTXdist project and license conditions
++# see the README file.
++#
++
++#
++# We provide this package
++#
++PACKAGES-$(PTXCONF_LIBTHTTP) += libthttp
++
++#
++# Paths and names
++#
++# The revision meta-pantavisor builds: 76 commits after the last tag (011).
++LIBTHTTP_VERSION	:= 011-76-gff79603fc178
++LIBTHTTP_SHA256		:= 98452b92c86a211bbb4fe8790c04f344f3cf0274b816da58bd2d51e6fb745f4f
++LIBTHTTP		:= libthttp-$(LIBTHTTP_VERSION)
++LIBTHTTP_SUFFIX		:= tar.gz
++LIBTHTTP_URL		:= git+https://github.com/pantavisor/libthttp.git;tag=$(LIBTHTTP_VERSION)
++LIBTHTTP_SOURCE		:= $(SRCDIR)/$(LIBTHTTP).$(LIBTHTTP_SUFFIX)
++LIBTHTTP_DIR		:= $(BUILDDIR)/$(LIBTHTTP)
++LIBTHTTP_LICENSE	:= MIT AND MPL-2.0
++LIBTHTTP_LICENSE_FILES	:= \
++	file://LICENSE;md5=bd0a4fad56a916f12a1c3cedb3976612
++
++# The root CAs come from ca-certificates' certdata.txt, but the whole bundle
++# is not installed: the initramfs only gets the roots in LIBTHTTP_CA_CERTS.
++# The part has no _DIR, so PTXdist downloads and checks it without
++# extracting it. The certificates on the target are MPL-2.0, hence the
++# package license.
++LIBTHTTP_CERTDATA_SHA256	 = $(CA_CERTIFICATES_SHA256)
++LIBTHTTP_CERTDATA_URL		 = $(CA_CERTIFICATES_URL)
++LIBTHTTP_CERTDATA_SOURCE	 = $(CA_CERTIFICATES_SOURCE)
++LIBTHTTP_PARTS			+= LIBTHTTP_CERTDATA
++
++# ----------------------------------------------------------------------------
++# Prepare
++# ----------------------------------------------------------------------------
++
++# Static library linked into Pantavisor's executables and its pv_lxc.so
++# plugin, hence PIC.
++LIBTHTTP_CONF_TOOL	:= cmake
++LIBTHTTP_CONF_OPT	:= \
++	$(CROSS_CMAKE_USR) \
++	-DCMAKE_POSITION_INDEPENDENT_CODE=ON
++
++# ----------------------------------------------------------------------------
++# Install
++# ----------------------------------------------------------------------------
++
++LIBTHTTP_CERTS_DIR	:= $(LIBTHTTP_DIR)-certdata
++LIBTHTTP_CA_CERTS	:= $(call remove_quotes, $(PTXCONF_LIBTHTTP_CA_CERTS))
++
++$(STATEDIR)/libthttp.install:
++	@$(call targetinfo)
++	@$(call world/install, LIBTHTTP)
++	@rm -rf $(LIBTHTTP_CERTS_DIR) $(LIBTHTTP_PKGDIR)/etc/thttp/certs
++	@mkdir -p $(LIBTHTTP_CERTS_DIR) $(LIBTHTTP_PKGDIR)/etc/thttp/certs
++	@cp $(LIBTHTTP_CERTDATA_SOURCE) $(LIBTHTTP_CERTS_DIR)/certdata.txt
++	@cd $(LIBTHTTP_CERTS_DIR) && \
++		python3 $(CA_CERTIFICATES_CERTDATA2PEM) > /dev/null
++	@found=0; \
++	for name in $(LIBTHTTP_CA_CERTS); do \
++		if [ -f "$(LIBTHTTP_CERTS_DIR)/$${name}.crt" ]; then \
++			install -m 0644 "$(LIBTHTTP_CERTS_DIR)/$${name}.crt" \
++				$(LIBTHTTP_PKGDIR)/etc/thttp/certs/; \
++			found=$$((found + 1)); \
++		else \
++			echo "warning: LIBTHTTP_CA_CERTS: $${name} is not in $(CA_CERTIFICATES_VERSION), skipping" >&2; \
++		fi; \
++	done; \
++	if [ $${found} -eq 0 ]; then \
++		echo "error: LIBTHTTP_CA_CERTS: no root certificate installed" >&2; \
++		exit 1; \
++	fi
++	@$(call touch)
++
++# ----------------------------------------------------------------------------
++# Target-Install
++# ----------------------------------------------------------------------------
++
++$(STATEDIR)/libthttp.targetinstall:
++	@$(call targetinfo)
++
++	@$(call install_init, libthttp)
++	@$(call install_fixup, libthttp,PRIORITY,optional)
++	@$(call install_fixup, libthttp,SECTION,base)
++	@$(call install_fixup, libthttp,AUTHOR,"Fernando Luiz Cola <fernando.luiz@pantacor.com>")
++	@$(call install_fixup, libthttp,DESCRIPTION,"libthttp TLS root certificates")
++
++	@$(call install_tree, libthttp, 0, 0, -, /etc/thttp/certs)
++
++	@$(call install_finish, libthttp)
++
++	@$(call touch)
++
++# vim: syntax=make
+-- 
+2.43.0
+

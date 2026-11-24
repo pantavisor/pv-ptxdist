@@ -52,8 +52,8 @@ Patches are based on PTXdist `master`, not on a release.
       without it, busybox gets 0200-0203 and dropbear nothing.
       `BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT` now depends on PANTAVISOR. The
       RFC patches are written on PTXdist master (d6b2c7954) and apply with
-      `git am`: `upstream/ptxdist/rfc/0006-busybox-*.patch` and
-      `0007-dropbear-*.patch`. They put the series files into PTXdist's
+      `git am`: `upstream/ptxdist/rfc/0007-busybox-*.patch` and
+      `0008-dropbear-*.patch` (RFC 7/8 and 8/8). They put the series files into PTXdist's
       `patches/busybox-1.38.0/` and a new `patches/dropbear-2026.94/`, and
       the symbols into `rules/busybox.in` and `rules/dropbear.in`.
       `FOLLOW_X_ROOT` goes into `rules/busybox.in` too, not
@@ -217,14 +217,14 @@ after the pantavisor package.
 | # | Patch | State |
 |---|---|---|
 | 0/8 | Cover letter | to write, last |
-| 1/8 | picohttpparser: new package | in this layer; convert |
-| 2/8 | libthttp: new package | in this layer; convert |
+| 1/8 | picohttpparser: new package | written (`upstream/ptxdist/rfc/0001-*`) |
+| 2/8 | libthttp: new package | written (`0002-*`); certdata.txt from ca-certificates |
 | 3/8 | libevent22: new package (static, Pantavisor only) | prototyped as `libevent-pv` |
 | 4/8 | pantavisor: new package, with the initramfs layout | in this layer; adapt |
 | 5/8 | lxc: Pantavisor-only patch series | to write |
 | 6/8 | mbedtls: Pantavisor-only patch series (`pk_wrap.c`) | to write |
-| 7/8 | busybox: Pantavisor-only patch series | written (`upstream/ptxdist/rfc/0006-*`) |
-| 8/8 | dropbear: Pantavisor-only patch series | written (`0007-*`); needs the GENKEYS patch |
+| 7/8 | busybox: Pantavisor-only patch series | written (`0007-*`) |
+| 8/8 | dropbear: Pantavisor-only patch series | written (`0008-*`); needs the GENKEYS patch |
 
 - [x] **picohttpparser**: upstream h2o/picohttpparser at 066d2b1 (what
       the Pantavisor fork is based on) plus the fork's CMake build as a
@@ -232,7 +232,9 @@ after the pantavisor package.
 - [ ] **libthttp**: depends on mbedtls. It downloads NSS `certdata.txt`
       as a second part to install only `LIBTHTTP_CA_CERTS`; upstream may
       prefer an option in PTXdist's ca-certificates package to install
-      chosen roots to a given directory.
+      chosen roots to a given directory. Its certdata.txt part now reuses
+      ca-certificates' (version, URL, checksum and certdata2pem.py), as
+      cross-llvm reuses llvm's sources, so the NSS version is pinned once.
 - [ ] **libevent22**: 2.2.2-alpha, PTXdist's license string
       (`BSD-3-Clause AND 0BSD AND MIT`) and the 2.2 `LICENSE` checksum.
 - [x] **pantavisor**: menu reviewed. Every option has help text, nothing

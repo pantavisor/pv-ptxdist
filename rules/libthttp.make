@@ -26,15 +26,14 @@ LIBTHTTP_LICENSE	:= MIT AND MPL-2.0
 LIBTHTTP_LICENSE_FILES	:= \
 	file://LICENSE;md5=bd0a4fad56a916f12a1c3cedb3976612
 
-# The root CAs come from the Mozilla list that PTXdist's ca-certificates
-# package uses, at the same NSS version, but the whole bundle is not
-# installed: the initramfs only gets the roots in LIBTHTTP_CA_CERTS. The part
-# has no _DIR, so PTXdist downloads and checks it without extracting it.
-# The certificates on the target are MPL-2.0, hence the package license.
-LIBTHTTP_CERTDATA_VERSION	:= NSS_3_123_RTM
-LIBTHTTP_CERTDATA_SHA256	:= 77130ef91213772844561fbd3aa31d413b25c2ac7f576fea3bc3bbff7ef93489
-LIBTHTTP_CERTDATA_URL		:= https://hg.mozilla.org/projects/nss/raw-file/$(LIBTHTTP_CERTDATA_VERSION)/lib/ckfw/builtins/certdata.txt
-LIBTHTTP_CERTDATA_SOURCE	:= $(SRCDIR)/certdata-$(LIBTHTTP_CERTDATA_VERSION).txt
+# The root CAs come from ca-certificates' certdata.txt, but the whole bundle
+# is not installed: the initramfs only gets the roots in LIBTHTTP_CA_CERTS.
+# The part has no _DIR, so PTXdist downloads and checks it without
+# extracting it. The certificates on the target are MPL-2.0, hence the
+# package license.
+LIBTHTTP_CERTDATA_SHA256	 = $(CA_CERTIFICATES_SHA256)
+LIBTHTTP_CERTDATA_URL		 = $(CA_CERTIFICATES_URL)
+LIBTHTTP_CERTDATA_SOURCE	 = $(CA_CERTIFICATES_SOURCE)
 LIBTHTTP_PARTS			+= LIBTHTTP_CERTDATA
 
 # ----------------------------------------------------------------------------
@@ -62,7 +61,7 @@ $(STATEDIR)/libthttp.install:
 	@mkdir -p $(LIBTHTTP_CERTS_DIR) $(LIBTHTTP_PKGDIR)/etc/thttp/certs
 	@cp $(LIBTHTTP_CERTDATA_SOURCE) $(LIBTHTTP_CERTS_DIR)/certdata.txt
 	@cd $(LIBTHTTP_CERTS_DIR) && \
-		python3 $(call ptx/in-path, PTXDIST_PATH_SCRIPTS, certdata2pem.py) > /dev/null
+		python3 $(CA_CERTIFICATES_CERTDATA2PEM) > /dev/null
 	@found=0; \
 	for name in $(LIBTHTTP_CA_CERTS); do \
 		if [ -f "$(LIBTHTTP_CERTS_DIR)/$${name}.crt" ]; then \
@@ -70,7 +69,7 @@ $(STATEDIR)/libthttp.install:
 				$(LIBTHTTP_PKGDIR)/etc/thttp/certs/; \
 			found=$$((found + 1)); \
 		else \
-			echo "warning: LIBTHTTP_CA_CERTS: $${name} is not in NSS $(LIBTHTTP_CERTDATA_VERSION), skipping" >&2; \
+			echo "warning: LIBTHTTP_CA_CERTS: $${name} is not in $(CA_CERTIFICATES_VERSION), skipping" >&2; \
 		fi; \
 	done; \
 	if [ $${found} -eq 0 ]; then \
