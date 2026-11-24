@@ -1,4 +1,4 @@
-From: Pantacor <dev@pantacor.com>
+From: Aníbal Portero Hermida <anibal.portero@pantacor.com>
 Subject: [PATCH] evhttp: guard callbacks against NULL evcon; demote replacefd assert
 
 Two fixes for evhttp used with SSL (mbedTLS) bufferevents:
@@ -17,7 +17,7 @@ Two fixes for evhttp used with SSL (mbedTLS) bufferevents:
    debug log so the process survives — the SSL bufferevent cleans up the
    underlying fd correctly on its own when freed.
 
-Signed-off-by: Pantacor <dev@pantacor.com>
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
  http.c | 9 +++++++++
  1 file changed, 9 insertions(+), 0 deletions(-)

@@ -4,9 +4,10 @@ Date: Wed, 11 Nov 2026 19:50:29 -0300
 Subject: [PATCH] pkg-config: drop the CMake debug postfix from the autotools
  .pc files
 
-The 2.2.1-alpha .pc.in files carry CMake's @CMAKE_DEBUG_POSTFIX@, which
-autotools never substitutes, so pkg-config consumers link against
--levent_core@CMAKE_DEBUG_POSTFIX@ and their configure link tests fail.
+The 2.2.1-alpha and 2.2.2-alpha .pc.in files carry CMake's
+@CMAKE_DEBUG_POSTFIX@, which autotools never substitutes, so pkg-config
+consumers link against -levent_core@CMAKE_DEBUG_POSTFIX@ and their
+configure link tests fail.
 
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---

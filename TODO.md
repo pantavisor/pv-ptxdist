@@ -17,7 +17,7 @@ Patches are based on PTXdist `master`, not on a release.
 | busybox | Stock 1.38.0 + 6 Pantavisor patches | In the RFC, applied only with Pantavisor (`BUSYBOX_SERIES`) |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
 | lxc | `lxc6-pv` (LXC 6 fork, `bfa6810a`); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump to 6.0.6 in PTXdist master (0bf3bd65e); fork patches in the RFC, see section 3 |
-| libevent | `libevent-pv` 2.2.1-alpha, static, private sysroot prefix, coexists with libevent 2.1 | RFC: a second, static libevent package only Pantavisor links |
+| libevent | `libevent22` 2.2.2-alpha, static, private sysroot prefix, coexists with libevent 2.1 | RFC: a second, static libevent package only Pantavisor links |
 | picohttpparser, libthttp, pantavisor | Layer packages | The RFC itself |
 
 ## 1. Stand-alone PTXdist patches (send before the RFC)
@@ -170,7 +170,7 @@ no rebuilds. The cost is a second libevent rule to keep up to date until
 2.2 has a stable release; then it goes and `libevent` is bumped. A bump
 of `libevent` stays the fallback if upstream prefers one version.
 
-Prototype in this layer (`libevent-pv`), checked on qemu-arm64 on
+Prototype in this layer (then `libevent-pv`), checked on qemu-arm64 on
 24 Nov 2026:
 
 - `pantavisor` and `pv-xconnect` need no libevent library; the initramfs
@@ -186,24 +186,29 @@ Prototype in this layer (`libevent-pv`), checked on qemu-arm64 on
 
 To do:
 
-- [ ] Write RFC 2/8 on PTXdist master: the new package (name to decide,
-      e.g. `libevent22`; PTXdist names have no dots), 2.2.2-alpha rather
-      than 2.2.1-alpha (all three patches apply unchanged), mbed TLS on,
-      static only, and the `pantavisor` side.
-- [ ] Move `libevent-pv` (and meta-pantavisor) to 2.2.2-alpha too, so
-      the RFC proposes what devices run.
+- [x] RFC 3/8 written (`upstream/ptxdist/rfc/0003-*`): `libevent22`,
+      2.2.2-alpha, mbed TLS, static only, private prefix, PTXdist's
+      license string; `configure_helper.py` shows only the intended
+      directory overrides. The layer's `libevent-pv` is now the same
+      `libevent22`. qemu-arm64 on 2.2.2-alpha (24 Nov 2026): boot, SSH,
+      Pantahub over TLS. The `pantavisor` side goes in 4/8.
+- [ ] Move meta-pantavisor to 2.2.2-alpha too, so the RFC proposes what
+      devices run.
 - [ ] Send the patches to libevent:
   - [ ] `evhttp-null-guard-freed-conn`: a crash fix for evhttp on TLS
-        bufferevents. Has a placeholder author (`Pantacor
-        <dev@pantacor.com>`); find the real one.
+        bufferevents. Written by Aníbal Portero Hermida (meta-pantavisor
+        6e4b8fcb0b); the placeholder author and sign-off are replaced by
+        him as author and Fernando's sign-off. Tell Aníbal, or have him
+        add his own sign-off.
   - [ ] `pkg-config-drop-cmake-debug-postfix`: master's `.pc.in` files
         still have `@CMAKE_DEBUG_POSTFIX@` (checked at d82464a2).
-  - [ ] `undef_ssl_renegotiation`: turns off renegotiation in the mbed TLS
-        bufferevent. Libevent's own `370d9924` only touches the tests.
-        Author is `OpenEmbedded <oe.patch@oe>`; find the real one and the
-        reason, or drop it if it is not needed with mbed TLS 3.
+- [x] `undef_ssl_renegotiation` dropped (24 Nov 2026): it only changes
+      `bufferevent_ssl_renegotiate()`, which neither Pantavisor nor
+      libthttp calls. It had no description or sign-off (added in
+      meta-pantavisor de04d20297). Build and Pantahub TLS test pass
+      without it.
 - [ ] meta-pantavisor sets `ac_cv_func_epoll_pwait2=no` for kernels older
-      than 5.11 (Jetson Nano 4.9). `libevent-pv` does not: decide whether
+      than 5.11 (Jetson Nano 4.9). `libevent22` does not: decide whether
       the PTXdist rule needs it.
 
 ## 5. The RFC series
@@ -219,7 +224,7 @@ after the pantavisor package.
 | 0/8 | Cover letter | to write, last |
 | 1/8 | picohttpparser: new package | written (`upstream/ptxdist/rfc/0001-*`) |
 | 2/8 | libthttp: new package | written (`0002-*`); certdata.txt from ca-certificates |
-| 3/8 | libevent22: new package (static, Pantavisor only) | prototyped as `libevent-pv` |
+| 3/8 | libevent22: new package (static, Pantavisor only) | written (`0003-*`) |
 | 4/8 | pantavisor: new package, with the initramfs layout | in this layer; adapt |
 | 5/8 | lxc: Pantavisor-only patch series | to write |
 | 6/8 | mbedtls: Pantavisor-only patch series (`pk_wrap.c`) | to write |

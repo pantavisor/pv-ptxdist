@@ -10,7 +10,7 @@ menuconfig PANTAVISOR
 	select LXC6_PV				if PANTAVISOR_LXC_STABLE
 	select LXC_PV				if PANTAVISOR_LXC_DEPRECATED
 	select ZLIB
-	select LIBEVENT_PV
+	select LIBEVENT22
 	select LIBC_DL
 	select LIBC_PTHREAD
 	select BUSYBOX_MDEV			if RUNTIME
