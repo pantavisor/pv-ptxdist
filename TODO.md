@@ -12,25 +12,29 @@ Patches are based on PTXdist `master`, not on a release.
 
 | Package | In this layer | Upstream form |
 |---|---|---|
-| mbedtls | Stock package, rule bumped to 2.28.10 (`rules/mbedtls.make`) | PTXdist patch to write |
-| dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | PTXdist patch to write for `DROPBEAR_GENKEYS`; the `-n` patch goes in the RFC, applied only with Pantavisor (`DROPBEAR_SERIES`) |
+| mbedtls | Stock package, rule bumped to 2.28.10 (`rules/mbedtls.make`) | In PTXdist master (f996777be); drop with the next release |
+| dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | `DROPBEAR_GENKEYS` patch sent 24 Nov 2026; the `-n` patch goes in the RFC, applied only with Pantavisor (`DROPBEAR_SERIES`) |
 | busybox | Stock 1.38.0 + 6 Pantavisor patches | In the RFC, applied only with Pantavisor (`BUSYBOX_SERIES`) |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
-| lxc | `lxc6-pv` (LXC 6 fork, `bfa6810a`); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump PTXdist's lxc 3.0.1 to 6.0.x (meson) plus 11 fork patches; see section 3 |
+| lxc | `lxc6-pv` (LXC 6 fork, `bfa6810a`); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump to 6.0.6 in PTXdist master (0bf3bd65e); fork patches in the RFC, see section 3 |
 | libevent | Still `libevent-pv` 2.2.1-alpha | Blocked |
 | picohttpparser, libthttp, pantavisor | Layer packages | The RFC itself |
 
 ## 1. Stand-alone PTXdist patches (send before the RFC)
 
-- [ ] **mbedtls: version bump 2.28.0 -> 2.28.10.** Turn the diff between
-      `rules/mbedtls.make` and PTXdist's into a patch on PTXdist master,
-      noting the license change to `Apache-2.0 OR GPL-2.0-or-later`. The
+- [x] **mbedtls: version bump 2.28.0 -> 2.28.10.** Sent 17 Nov 2026
+      (`<20261117144028.34074-1-fernando.luiz@pantacor.com>`), applied
+      unchanged on 21 Nov as f996777be. License now
+      `Apache-2.0 OR GPL-2.0-or-later`. The
       pk_wrap.c patch (`patches/mbedtls-2.28.10/`) is Pantavisor-specific:
       send it with the RFC, or to mbed TLS first.
-- [ ] **dropbear: add DROPBEAR_GENKEYS.** The diff between
-      `rules/dropbear.{in,make,postinst}` and PTXdist's. The postinst guard
-      matches openssh's. Without it, enabling dropbear selects INITMETHOD,
-      whose default is systemd.
+- [ ] **dropbear: make host key generation optional.** Sent 24 Nov 2026
+      (`<20261124175844.453455-1-fernando.luiz@pantacor.com>`), no Cc;
+      waiting for review. `upstream/ptxdist/0001-dropbear-make-host-key-generation-optional.patch`.
+      Adds `DROPBEAR_GENKEYS` (default y); the postinst guard matches
+      openssh's. Without it, enabling dropbear selects INITMETHOD, whose
+      default is systemd. Checked with it off on v8a; the default path is
+      checked by reading only. RFC 7/8 sits on top of it.
 - [x] **busybox: fix the `mdev -s` crash first.** `0304` (MODALIAS) passed
       a NULL device name to `regexec()` for PCI devices without `DEVNAME`
       as soon as `mdev.conf` had a device-name rule. `0305` skips name
@@ -60,8 +64,10 @@ Patches are based on PTXdist `master`, not on a release.
       `-c` is documented, nsenter links without setpriv/run-init,
       `chdir()`/`chroot()` are checked when following the root, no
       warnings beyond stock 1.38.0's, every patch builds on its own).
-- [x] **lxc: version bump 3.0.1 -> 6.0.6.** Written on PTXdist master
-      (4da61501e): `upstream/ptxdist/0001-lxc-version-bump-3.0.1-6.0.6.patch`.
+- [x] **lxc: version bump 3.0.1 -> 6.0.6.** Sent 17 Nov 2026
+      (`<20261117143034.15388-1-fernando.luiz@pantacor.com>`, Cc Michael
+      Grzeschik), applied unchanged on 21 Nov as 0bf3bd65e. Written on
+      PTXdist master (4da61501e): `upstream/ptxdist/0001-lxc-version-bump-3.0.1-6.0.6.patch`.
       Meson, every option pinned (`configure_helper.py` shows no
       difference), license set. Cross-built and target-installed with
       `LXC_TEST_TOOLS` on v8a; `lint` and `licensecheck` pass. Stock 6.0.6
