@@ -17,7 +17,7 @@ Patches are based on PTXdist `master`, not on a release.
 | busybox | Stock 1.38.0 + 6 Pantavisor patches | In the RFC, applied only with Pantavisor (`BUSYBOX_SERIES`) |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
 | lxc | `lxc6-pv` (LXC 6 fork, `bfa6810a`); `lxc-pv` (LXC 3) kept as the deprecated choice | Bump to 6.0.6 in PTXdist master (0bf3bd65e); fork patches in the RFC, see section 3 |
-| libevent | Still `libevent-pv` 2.2.1-alpha | Blocked |
+| libevent | `libevent-pv` 2.2.1-alpha, static, private sysroot prefix, coexists with libevent 2.1 | RFC: a second, static libevent package only Pantavisor links |
 | picohttpparser, libthttp, pantavisor | Layer packages | The RFC itself |
 
 ## 1. Stand-alone PTXdist patches (send before the RFC)
@@ -141,48 +141,48 @@ include, section 2) and `c2017d42` (rebase notes).
 - [x] Drop the LXC 3 series from `upstream/ptxdist/`.
 - [ ] Drop `lxc-pv` once nobody needs the deprecated choice.
 
-## 4. libevent: the case for 2.2
+## 4. libevent: a static 2.2 only Pantavisor links
 
-The RFC proposes what meta-pantavisor does: libevent 2.2 replaces 2.1
-for the whole image (its recipe is `libevent_2.2.1.bb`, which overrides
-OE-core's), built with mbed TLS. In PTXdist that means a version bump of
-the `libevent` package, not a second libevent package: both would
-install the same headers.
+Pantavisor talks to Pantahub over HTTPS through evhttp on an mbed TLS
+bufferevent (`bufferevent_mbedtls_dyncontext_new()`, `libevent_mbedtls`).
+That backend exists only in 2.2; 2.1 has OpenSSL only. Everything else
+Pantavisor uses (evhttp client and server) is in 2.1 too. mbed TLS
+rather than OpenSSL: presumably for size, as Pantavisor runs from the
+initramfs; confirm with the Pantavisor team before writing it in the
+cover letter.
 
-Why 2.2:
+meta-pantavisor replaces libevent 2.1 with 2.2 for the whole image. The
+RFC proposes something smaller: PTXdist's `libevent` stays at 2.1, and a
+second package builds 2.2 as static libraries in a private sysroot
+prefix (`/usr/lib/libevent-2.2/{include,lib}`) with nothing installed on
+the target. `pantavisor` finds it through `CMAKE_PREFIX_PATH` and an
+`-I`, without source changes. That answers the objections a bump would
+get: no alpha for the 7 packages that use libevent (json-dbus-bridge,
+libcamera, lldpd, libwebsockets, ntp, nfsutils, tmux), no soname change,
+no rebuilds. The cost is a second libevent rule to keep up to date until
+2.2 has a stable release; then it goes and `libevent` is bumped. A bump
+of `libevent` stays the fallback if upstream prefers one version.
 
-- Pantavisor talks to Pantahub over HTTPS through evhttp on an mbed TLS
-  bufferevent (`bufferevent_mbedtls_dyncontext_new()`, `libevent_mbedtls`).
-  That backend exists only in 2.2; 2.1 has OpenSSL only. Everything else
-  Pantavisor uses (evhttp client and server) is in 2.1 too.
-- mbed TLS rather than OpenSSL: presumably for size, as Pantavisor runs
-  from the initramfs. Confirm with the Pantavisor team before writing it
-  in the cover letter.
-- 2.2 is what Pantavisor devices run: every meta-pantavisor build uses
-  it, with the patches below.
+Prototype in this layer (`libevent-pv`), checked on qemu-arm64 on
+24 Nov 2026:
 
-What upstream will object to, and the answers:
-
-- **"It is an alpha."** 2.2 is the development series libevent releases
-  from: 2.2.1-alpha (2023-05), 2.2.2-alpha (2026-07), master active (11
-  commits after 2.2.2-alpha). There is no 2.2 stable to wait for, and 2.1
-  gets no new features. 2.2.2-alpha adds mbed TLS 3 and 4 support
-  (`7cfffeaa`), which the mbed TLS 2.28 EOL question needs anyway.
-- **"It changes libevent for everyone."** The soname changes
-  (`libevent-2.1.so.7` -> `libevent-2.2.so.1`), so the 7 packages that
-  select `LIBEVENT` rebuild: json-dbus-bridge, libcamera, lldpd,
-  libwebsockets, ntp, nfsutils, tmux. The 2.1 API is kept. Build all 7
-  against it before sending and list the result in the patch.
-- **"Patches on an alpha."** Each one is small and goes to libevent
-  first (below).
+- `pantavisor` and `pv-xconnect` need no libevent library; the initramfs
+  has none. `root.cpio.gz` 8,472,503 -> 8,334,520 bytes (-138 KB),
+  uncompressed -471 KB: the binaries grow by 328 KB and 262 KB, the five
+  shared libraries (1.06 MB) go, three of which nothing used.
+- Boot, SSH into `_pv_`, `os` and `pvr-sdk`, wrong key refused, and
+  Pantavisor reaches Pantahub over TLS (online, token, device checks).
+- With `LIBEVENT` and `TMUX` enabled as well, the sysroot holds 2.1.13
+  in `/usr` and 2.2.1 in the private prefix; tmux links
+  `libevent_core-2.1.so.7`, Pantavisor the static 2.2, and its depfiles
+  show the 2.2 headers.
 
 To do:
 
-- [ ] Write the PTXdist patch: `libevent` 2.1.13 -> 2.2.2-alpha, with a
-      `LIBEVENT_MBEDTLS` option next to `LIBEVENT_OPENSSL`. Propose
-      2.2.2-alpha, not meta's 2.2.1-alpha: all three patches apply to it
-      unchanged.
-- [ ] Build the 7 consumers against it.
+- [ ] Write RFC 2/8 on PTXdist master: the new package (name to decide,
+      e.g. `libevent22`; PTXdist names have no dots), 2.2.2-alpha rather
+      than 2.2.1-alpha (all three patches apply unchanged), mbed TLS on,
+      static only, and the `pantavisor` side.
 - [ ] Move `libevent-pv` (and meta-pantavisor) to 2.2.2-alpha too, so
       the RFC proposes what devices run.
 - [ ] Send the patches to libevent:
@@ -244,7 +244,9 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
 
 - Carrying Pantavisor's LXC 6 patches (section 3) that lxc upstream does
   not take: acceptable in PTXdist, or must they all land in lxc first?
-- libevent 2.2 for everyone, as meta-pantavisor does (section 4).
+- A second, static libevent 2.2 that only Pantavisor links, until 2.2
+  has a stable release; or bump `libevent` for everyone, as
+  meta-pantavisor does (section 4).
 - A `pantavisor` init choice: Pantavisor is PID 1, so it could be an
   `INITMETHOD` choice, or a standalone initramfs package.
 - mbed TLS 2.28 LTS is end-of-life. Should Pantavisor and libthttp move to

@@ -28,6 +28,10 @@ LIBEVENT_PV_LICENSE	:= BSD-3-Clause AND MIT
 LIBEVENT_PV_LICENSE_FILES	:= \
 	file://LICENSE;md5=eaea438df011ea096feec284927c59e0
 
+# Private sysroot prefix: libevent 2.1 installs the same headers,
+# libevent.so and libevent.pc to /usr. Only Pantavisor looks here.
+LIBEVENT_PV_PREFIX	:= /usr/lib/libevent-$(LIBEVENT_PV_API)
+
 # ----------------------------------------------------------------------------
 # Prepare
 # ----------------------------------------------------------------------------
@@ -38,6 +42,12 @@ LIBEVENT_PV_LICENSE_FILES	:= \
 LIBEVENT_PV_CONF_TOOL	:= autoconf
 LIBEVENT_PV_CONF_OPT	:= \
 	$(CROSS_AUTOCONF_USR) \
+	--bindir=$(LIBEVENT_PV_PREFIX)/bin \
+	--includedir=$(LIBEVENT_PV_PREFIX)/include \
+	--libdir=$(LIBEVENT_PV_PREFIX)/lib \
+	--disable-shared \
+	--enable-static \
+	--with-pic \
 	--disable-gcc-warnings \
 	--enable-gcc-hardening \
 	--enable-thread-support \
@@ -58,23 +68,9 @@ LIBEVENT_PV_CONF_OPT	:= \
 # Target-Install
 # ----------------------------------------------------------------------------
 
+# Static only: Pantavisor carries what it uses, nothing goes on the target.
 $(STATEDIR)/libevent-pv.targetinstall:
 	@$(call targetinfo)
-
-	@$(call install_init, libevent-pv)
-	@$(call install_fixup, libevent-pv,PRIORITY,optional)
-	@$(call install_fixup, libevent-pv,SECTION,base)
-	@$(call install_fixup, libevent-pv,AUTHOR,"Fernando Luiz Cola <fernando.luiz@pantacor.com>")
-	@$(call install_fixup, libevent-pv,DESCRIPTION,missing)
-
-	@$(call install_lib, libevent-pv, 0, 0, 0644, libevent-$(LIBEVENT_PV_API))
-	@$(call install_lib, libevent-pv, 0, 0, 0644, libevent_core-$(LIBEVENT_PV_API))
-	@$(call install_lib, libevent-pv, 0, 0, 0644, libevent_extra-$(LIBEVENT_PV_API))
-	@$(call install_lib, libevent-pv, 0, 0, 0644, libevent_pthreads-$(LIBEVENT_PV_API))
-	@$(call install_lib, libevent-pv, 0, 0, 0644, libevent_mbedtls-$(LIBEVENT_PV_API))
-
-	@$(call install_finish, libevent-pv)
-
 	@$(call touch)
 
 # vim: syntax=make

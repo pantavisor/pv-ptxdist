@@ -29,9 +29,16 @@ PANTAVISOR_LICENSE_FILES := \
 # Prepare
 # ----------------------------------------------------------------------------
 
+# libevent-pv's private prefix (LIBEVENT_PV_PREFIX), spelled out because
+# rule files are not included in a fixed order. CMAKE_PREFIX_PATH makes
+# find_library() take its static libs before a libevent 2.1 in /usr/lib.
+PANTAVISOR_LIBEVENT_PREFIX := /usr/lib/libevent-2.2
+PANTAVISOR_CPPFLAGS	:= -I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_LIBEVENT_PREFIX)/include
+
 PANTAVISOR_CONF_TOOL	:= cmake
 PANTAVISOR_CONF_OPT	:= \
 	$(CROSS_CMAKE_USR) \
+	-DCMAKE_PREFIX_PATH=$(PANTAVISOR_LIBEVENT_PREFIX) \
 	-DPANTAVISOR_APPENGINE=OFF \
 	-DPANTAVISOR_CLANG_FORMAT_CHECK=OFF \
 	-DPANTAVISOR_DCP_BLOB_CREATE=OFF \
