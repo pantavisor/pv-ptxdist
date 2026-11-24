@@ -27,7 +27,7 @@ Patches are based on PTXdist `master`, not on a release.
       unchanged on 21 Nov as f996777be. License now
       `Apache-2.0 OR GPL-2.0-or-later`. The
       pk_wrap.c patch (`patches/mbedtls-2.28.10/`) is Pantavisor-specific:
-      send it with the RFC, or to mbed TLS first.
+      it goes in RFC 6/8 as a Pantavisor-only series (section 5).
 - [ ] **dropbear: make host key generation optional.** Sent 24 Nov 2026
       (`<20261124175844.453455-1-fernando.luiz@pantacor.com>`), no Cc;
       waiting for review. `upstream/ptxdist/0001-dropbear-make-host-key-generation-optional.patch`.
@@ -113,7 +113,14 @@ patch that stops meson forcing the gold linker. Pantavisor runs it with
 - [ ] `568fd7fd` the `lxc.rootfs.bdev_type` key.
 - [ ] The gold linker patch: check whether lxc main still forces gold.
 
-### Pantavisor-specific: needs a rework first
+### Pantavisor-specific
+
+Decided 24 Nov 2026: these go into RFC 5/8 as a Pantavisor-only series
+(`series.pantavisor`, `LXC_SERIES`), like busybox and dropbear, so they
+no longer need a config key to be safe for other builds. The reworks
+below still make them easier to argue for; `realpath_x()` has to be
+flagged in the cover letter either way.
+
 
 - [ ] `897b2c54` `set_container_type()` API. Hardcodes Pantavisor's
       container type; make it generic or move the logic into Pantavisor.
@@ -199,7 +206,25 @@ To do:
       than 5.11 (Jetson Nano 4.9). `libevent-pv` does not: decide whether
       the PTXdist rule needs it.
 
-## 5. The RFC series: new packages
+## 5. The RFC series
+
+Decided 24 Nov 2026: the Pantavisor-only series covers lxc and mbedtls
+too; the developer trust store stays in this layer; the initramfs layout
+folds into the pantavisor patch; the second libevent is `libevent22`.
+Order: the Pantavisor-only series refer to `PANTAVISOR`, so they come
+after the pantavisor package.
+
+| # | Patch | State |
+|---|---|---|
+| 0/8 | Cover letter | to write, last |
+| 1/8 | picohttpparser: new package | in this layer; convert |
+| 2/8 | libthttp: new package | in this layer; convert |
+| 3/8 | libevent22: new package (static, Pantavisor only) | prototyped as `libevent-pv` |
+| 4/8 | pantavisor: new package, with the initramfs layout | in this layer; adapt |
+| 5/8 | lxc: Pantavisor-only patch series | to write |
+| 6/8 | mbedtls: Pantavisor-only patch series (`pk_wrap.c`) | to write |
+| 7/8 | busybox: Pantavisor-only patch series | written (`upstream/ptxdist/rfc/0006-*`) |
+| 8/8 | dropbear: Pantavisor-only patch series | written (`0007-*`); needs the GENKEYS patch |
 
 - [x] **picohttpparser**: upstream h2o/picohttpparser at 066d2b1 (what
       the Pantavisor fork is based on) plus the fork's CMake build as a
@@ -208,23 +233,27 @@ To do:
       as a second part to install only `LIBTHTTP_CA_CERTS`; upstream may
       prefer an option in PTXdist's ca-certificates package to install
       chosen roots to a given directory.
+- [ ] **libevent22**: 2.2.2-alpha, PTXdist's license string
+      (`BSD-3-Clause AND 0BSD AND MIT`) and the 2.2 `LICENSE` checksum.
 - [x] **pantavisor**: menu reviewed. Every option has help text, nothing
-      is board-specific, the debug build is off by default (the layer's
-      ptxconfig keeps it on), and `PANTAVISOR_DEVELOPER_TRUST` makes the
-      developer trust store visible and optional.
+      is board-specific, and the debug build is off by default (the
+      layer's ptxconfig keeps it on).
+- [ ] **pantavisor in the RFC**: select `LXC` and `LIBEVENT22` instead of
+      the forks, drop the LXC 3 choice (PTXdist's lxc is 6.0.6), fold in
+      `pantavisor-rootfs` so PTXdist alone gives a bootable Pantavisor
+      initramfs, and leave out `PANTAVISOR_DEVELOPER_TRUST`:
+      `host-pv-developer-ca` has no license, so the option and the
+      package stay in this layer.
 - [x] For each: every CMake option pinned (`configure_helper.py` shows
       only `CMAKE_POSITION_INDEPENDENT_CODE`, kept on purpose, and
       `find_library()` results), `_LICENSE` and `_LICENSE_FILES` set,
       `git+https` URLs with PTXdist-style versions, `licensecheck` passes,
       `lint` reports nothing for them.
-- [ ] Not built: `PANTAVISOR_DEVELOPER_TRUST` off.
-- [ ] Decide whether **pantavisor-rootfs** (the initramfs layout) folds into
-      the `pantavisor` package, so that PTXdist alone gives a bootable
-      Pantavisor initramfs.
 
 ### Stays in this layer
 
-`host-pv-*` and `pv-containers` (container exports), and `host-pvr`.
+`host-pv-*` and `pv-containers` (container exports), `host-pvr`, and the
+developer trust store (`host-pv-developer-ca`, `PANTAVISOR_DEVELOPER_TRUST`).
 `host-pvr` downloads a prebuilt amd64 binary, which PTXdist will not take;
 upstream it would need a Go source build. Also the `image-pv-*` image types,
 the kernel fragments and the boot scripts. `ptxdist lint` only warns about
@@ -242,8 +271,6 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
 
 ## 7. Open questions for the cover letter
 
-- Carrying Pantavisor's LXC 6 patches (section 3) that lxc upstream does
-  not take: acceptable in PTXdist, or must they all land in lxc first?
 - A second, static libevent 2.2 that only Pantavisor links, until 2.2
   has a stable release; or bump `libevent` for everyone, as
   meta-pantavisor does (section 4).
@@ -251,10 +278,11 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
   `INITMETHOD` choice, or a standalone initramfs package.
 - mbed TLS 2.28 LTS is end-of-life. Should Pantavisor and libthttp move to
   mbed TLS 3.x, or to OpenSSL, before upstream depends on them?
-- Pantavisor-only patch series for busybox and dropbear
-  (`series.pantavisor`, chosen by `BUSYBOX_SERIES`/`DROPBEAR_SERIES`):
-  nobody else's build changes, but whoever bumps busybox or dropbear has
-  to rebase them. Acceptable, or should they stay in a layer?
+- Pantavisor-only patch series for lxc, mbedtls, busybox and dropbear
+  (`series.pantavisor`, chosen by `<PKG>_SERIES`): nobody else's build
+  changes, but whoever bumps those packages has to rebase them.
+  Acceptable, or should they stay in a layer? `realpath_x()` in the lxc
+  series follows symlinks stock lxc refuses (CVE-2015-1335).
 
 ## Smaller decisions
 
