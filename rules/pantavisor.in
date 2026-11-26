@@ -3,6 +3,8 @@
 menuconfig PANTAVISOR
 	tristate
 	prompt "pantavisor                    "
+	# /media is a link into /run/pantavisor (see pantavisor.make)
+	depends on !ROOTFS_MEDIA
 	select HOST_CMAKE
 	select LIBTHTTP
 	select PICOHTTPPARSER
@@ -34,7 +36,10 @@ menuconfig PANTAVISOR
 	help
 	  Pantavisor: container-based init and update agent for embedded
 	  Linux. Built in "embedded" mode, i.e. it runs as PID 1 from the
-	  initramfs (/init -> /usr/bin/pantavisor).
+	  initramfs (/init -> /usr/bin/pantavisor). Also installs the
+	  initramfs layout Pantavisor expects: /storage, /volumes,
+	  /exports and /writable, and /pv, /media and /configs as links
+	  into /run/pantavisor.
 
 if PANTAVISOR
 
@@ -65,8 +70,9 @@ config PANTAVISOR_DEBUG
 	prompt "debug build"
 	help
 	  Build with PANTAVISOR_DEBUG: a debug shell on the console and
-	  the debug SSH server (dropbear) on port 8222, plus extra
-	  logging. Not for production.
+	  the debug SSH server on port 8222, plus extra logging. Not for
+	  production. The SSH server needs DROPBEAR, with DROPBEAR_GENKEYS
+	  off: Pantavisor starts it with -R.
 
 config PANTAVISOR_DEVELOPER_TRUST
 	bool

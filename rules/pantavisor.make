@@ -139,6 +139,14 @@ endif
 	@$(call install_alternative, pantavisor, 0, 0, 0644, /etc/pantavisor.config)
 	@$(call install_alternative, pantavisor, 0, 0, 0644, /etc/lxc/lxc.conf)
 
+	@$(call install_copy, pantavisor, 0, 0, 0755, /storage)
+	@$(call install_copy, pantavisor, 0, 0, 0755, /volumes)
+	@$(call install_copy, pantavisor, 0, 0, 0755, /exports)
+	@$(call install_copy, pantavisor, 0, 0, 0755, /writable)
+	@$(call install_link, pantavisor, run/pantavisor/pv, /pv)
+	@$(call install_link, pantavisor, run/pantavisor/media, /media)
+	@$(call install_link, pantavisor, run/pantavisor/configs, /configs)
+
 	@$(call install_finish, pantavisor)
 
 	@$(call touch)

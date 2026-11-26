@@ -250,7 +250,7 @@ the stock series. The pantavisor patch drops the unused
 | 4/7 | lxc: Pantavisor-only patch series | written (`0004-*`) |
 | 5/7 | busybox: Pantavisor-only patch series | written (`0005-*`) |
 | 6/7 | dropbear: Pantavisor-only patch series | written (`0006-*`); needs the GENKEYS patch |
-| 7/7 | pantavisor: new package, with the initramfs layout | in this layer; adapt |
+| 7/7 | pantavisor: new package, with the initramfs layout | written (`0007-*`) |
 
 - [x] **mbedtls: no RFC patch (26 Nov 2026).** The meta-pantavisor
       `pk_wrap.c` patch made ECDSA verify retry a non-DER signature as
@@ -286,12 +286,21 @@ the stock series. The pantavisor patch drops the unused
 - [x] **pantavisor**: menu reviewed. Every option has help text, nothing
       is board-specific, and the debug build is off by default (the
       layer's ptxconfig keeps it on).
-- [ ] **pantavisor in the RFC**: select `LXC` and `LIBEVENT22` instead of
-      the forks, drop the LXC 3 choice (PTXdist's lxc is 6.0.6), fold in
-      `pantavisor-rootfs` so PTXdist alone gives a bootable Pantavisor
-      initramfs, and leave out `PANTAVISOR_DEVELOPER_TRUST`:
-      `host-pv-developer-ca` has no license, so the option and the
-      package stay in this layer.
+- [x] **pantavisor in the RFC (7/7, 26 Nov 2026)**: `SECTION=applications`
+      (next to rauc; `initmethod` is only shown with `INITMETHOD` on),
+      selects `LXC` and `LIBEVENT22`, no LXC 3 choice (cgroup version
+      `auto`), the initramfs layout folded in (`depends on !ROOTFS_MEDIA`,
+      since `/media` is a link), `PANTAVISOR_PVS_SKIP_INSTALL=ON` instead of
+      `PANTAVISOR_DEVELOPER_TRUST`, and the three Pantavisor patches. The
+      debug help says the SSH server needs `DROPBEAR` with `GENKEYS` off;
+      selecting `DROPBEAR` would pull in `INITMETHOD` while `GENKEYS`
+      defaults to y. All 7 patches apply with `git am` on master
+      `d6b2c7954` plus GENKEYS.
+- [x] The layer folds `pantavisor-rootfs` into `pantavisor` the same way;
+      its rule is now the RFC's plus the layer-only parts: the
+      `pantavisor` menu, `PANTAVISOR_DEVELOPER_TRUST` and the LXC 3 choice.
+      qemu-arm64: boot, SSH into all three, containers READY, signature OK,
+      Pantahub online; lint shows only the 3 known warnings.
 - [x] For each: every CMake option pinned (`configure_helper.py` shows
       only `CMAKE_POSITION_INDEPENDENT_CODE`, kept on purpose, and
       `find_library()` results), `_LICENSE` and `_LICENSE_FILES` set,
