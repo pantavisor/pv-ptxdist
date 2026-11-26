@@ -8,7 +8,7 @@ menuconfig PANTAVISOR
 	select HOST_CMAKE
 	select LIBTHTTP
 	select PICOHTTPPARSER
-	select MBEDTLS
+	select MBEDTLS36
 	select LXC				if PANTAVISOR_LXC_STABLE
 	select LXC_PV				if PANTAVISOR_LXC_DEPRECATED
 	select ZLIB

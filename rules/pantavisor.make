@@ -29,16 +29,22 @@ PANTAVISOR_LICENSE_FILES := \
 # Prepare
 # ----------------------------------------------------------------------------
 
-# libevent22's private prefix (LIBEVENT22_PREFIX), spelled out because
-# rule files are not included in a fixed order. CMAKE_PREFIX_PATH makes
-# find_library() take its static libs before a libevent 2.1 in /usr/lib.
+# The private prefixes of libevent22 and mbedtls36 (LIBEVENT22_PREFIX,
+# MBEDTLS36_PREFIX), spelled out because rule files are not included in a
+# fixed order. CMAKE_PREFIX_PATH makes find_library() take their static
+# libs before a libevent 2.1 or mbedtls 4 in /usr/lib. The include paths go
+# into CPPFLAGS: CMakeLists.txt passes PANTAVISOR_RUNTIME_MBEDTLS_INCLUDE_DIR,
+# not the _DIRS it finds.
 PANTAVISOR_LIBEVENT_PREFIX := /usr/lib/libevent-2.2
-PANTAVISOR_CPPFLAGS	:= -I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_LIBEVENT_PREFIX)/include
+PANTAVISOR_MBEDTLS_PREFIX := /usr/lib/mbedtls-3.6
+PANTAVISOR_CPPFLAGS	:= \
+	-I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_LIBEVENT_PREFIX)/include \
+	-I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_MBEDTLS_PREFIX)/include
 
 PANTAVISOR_CONF_TOOL	:= cmake
 PANTAVISOR_CONF_OPT	:= \
 	$(CROSS_CMAKE_USR) \
-	-DCMAKE_PREFIX_PATH=$(PANTAVISOR_LIBEVENT_PREFIX) \
+	-DCMAKE_PREFIX_PATH="$(PANTAVISOR_LIBEVENT_PREFIX);$(PANTAVISOR_MBEDTLS_PREFIX)" \
 	-DPANTAVISOR_APPENGINE=OFF \
 	-DPANTAVISOR_CLANG_FORMAT_CHECK=OFF \
 	-DPANTAVISOR_DCP_BLOB_CREATE=OFF \

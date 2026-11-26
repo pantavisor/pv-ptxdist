@@ -40,11 +40,19 @@ LIBTHTTP_PARTS			+= LIBTHTTP_CERTDATA
 # Prepare
 # ----------------------------------------------------------------------------
 
+# mbedtls36's private prefix (MBEDTLS36_PREFIX), spelled out because rule
+# files are not included in a fixed order. The include path goes into
+# CPPFLAGS as well: CMakeLists.txt finds MBEDTLS_INCLUDE_DIRS but passes
+# MBEDTLS_INCLUDE_DIR to include_directories().
+LIBTHTTP_MBEDTLS_PREFIX	:= /usr/lib/mbedtls-3.6
+LIBTHTTP_CPPFLAGS	:= -I$(PTXDIST_SYSROOT_TARGET)$(LIBTHTTP_MBEDTLS_PREFIX)/include
+
 # Static library linked into Pantavisor's executables and its pv_lxc.so
 # plugin, hence PIC.
 LIBTHTTP_CONF_TOOL	:= cmake
 LIBTHTTP_CONF_OPT	:= \
 	$(CROSS_CMAKE_USR) \
+	-DCMAKE_PREFIX_PATH=$(LIBTHTTP_MBEDTLS_PREFIX) \
 	-DCMAKE_POSITION_INDEPENDENT_CODE=ON
 
 # ----------------------------------------------------------------------------

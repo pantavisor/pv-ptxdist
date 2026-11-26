@@ -1,0 +1,33 @@
+From 9e16648a3011b27421b54142a5928d41baa0b75e Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Thu, 26 Nov 2026 17:57:14 -0300
+Subject: [PATCH] cmake: link libevent before mbed TLS
+
+libevent_mbedtls calls into mbed TLS, so with static libraries it has to
+come before them on the link line, or symbols such as mbedtls_strerror()
+stay undefined. Shared libraries hide the wrong order.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2eb4dff1..57f85119 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -381,10 +381,10 @@ target_include_directories(pantavisor PRIVATE
+ target_link_libraries(pantavisor
+ 	${PANTAVISOR_RUNTIME_THTTP}
+ 	${PANTAVISOR_RUNTIME_PICOHTTPPARSER}
++	${PANTAVISOR_RUNTIME_EVENT_LIBRARIES}
+ 	${PANTAVISOR_RUNTIME_MBEDTLS_LIBRARIES}
+ 	${PANTAVISOR_RUNTIME_LXC}
+ 	${PANTAVISOR_RUNTIME_ZLIB}
+-	${PANTAVISOR_RUNTIME_EVENT_LIBRARIES}
+ 	pthread
+ )
+ 
+-- 
+2.43.0
+

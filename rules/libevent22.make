@@ -37,6 +37,20 @@ LIBEVENT22_PREFIX	:= /usr/lib/libevent-$(LIBEVENT22_API)
 # Prepare
 # ----------------------------------------------------------------------------
 
+# mbedtls36's private prefix (MBEDTLS36_PREFIX), spelled out because rule
+# files are not included in a fixed order.
+LIBEVENT22_MBEDTLS_PREFIX := $(PTXDIST_SYSROOT_TARGET)/usr/lib/mbedtls-3.6
+LIBEVENT22_CPPFLAGS	:= -I$(LIBEVENT22_MBEDTLS_PREFIX)/include
+LIBEVENT22_LDFLAGS	:= -L$(LIBEVENT22_MBEDTLS_PREFIX)/lib
+
+# configure's mbedtls check links -lmbedtls -lmbedcrypto -lmbedx509, an order
+# only shared libraries forgive: x509 needs crypto. A preset have_mbedtls
+# skips that check.
+LIBEVENT22_CONF_ENV	:= \
+	$(CROSS_ENV) \
+	have_mbedtls=yes \
+	MBEDTLS_LIBS="-lmbedtls -lmbedx509 -lmbedcrypto"
+
 # The directory options follow CROSS_AUTOCONF_USR, whose --libdir they
 # override.
 LIBEVENT22_CONF_TOOL	:= autoconf

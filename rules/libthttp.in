@@ -4,7 +4,7 @@ config LIBTHTTP
 	tristate
 	prompt "libthttp"
 	select HOST_CMAKE
-	select MBEDTLS
+	select MBEDTLS36
 	select HOST_SYSTEM_PYTHON3
 	help
 	  Tiny HTTP/REST client library used by Pantavisor to talk to
