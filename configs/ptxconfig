@@ -2593,7 +2593,6 @@ PTXCONF_LXC=y
 PTXCONF_LXC_SERIES="series.pantavisor"
 # PTXCONF_LZ4 is not set
 PTXCONF_MBEDTLS=y
-PTXCONF_MBEDTLS_SERIES="series.pantavisor"
 # PTXCONF_MLPACK is not set
 # PTXCONF_MPFR is not set
 # PTXCONF_NANOPB is not set

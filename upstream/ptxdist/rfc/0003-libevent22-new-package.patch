@@ -1,7 +1,7 @@
-From 1a0ef705592d6e896fea1fdc7fea6ad21aaafcea Mon Sep 17 00:00:00 2001
+From c025f3d8d4ef27ec579879d3f567373e1a415e77 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 16:30:14 -0300
-Subject: [RFC PATCH 3/8] libevent22: new package
+Subject: [RFC PATCH 3/7] libevent22: new package
 
 Pantavisor talks to its cloud over HTTPS through evhttp on an mbed TLS
 bufferevent. That backend only exists in libevent 2.2, and 2.2 has only

@@ -1,7 +1,7 @@
-From 336ef878b703dfb0301dacea6341ccbc00054f6e Mon Sep 17 00:00:00 2001
+From c4a95006f049842fefe610642f1e8533e4f2838f Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 10:28:06 -0300
-Subject: [RFC PATCH 6/8] busybox: add a Pantavisor-only patch series
+Subject: [RFC PATCH 5/7] busybox: add a Pantavisor-only patch series
 
 Pantavisor needs six busybox changes, all from its busybox-pv fork
 (github.com/pantavisor/busybox-pv), rebased onto 1.38.0:

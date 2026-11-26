@@ -1,5 +1,5 @@
 28b5d6636593544abc864f1887116c09
-1229229827d52c2ad92ad5a410284966
+af18c688bfe8f84790e3e7efc97a19ee
 # PTXCONF_ARM_MEMSPEED is not set
 # PTXCONF_BC is undefined
 # PTXCONF_BOOTCHART is undefined
@@ -845,7 +845,6 @@ PTXCONF_LXC_SERIES="series.pantavisor"
 # PTXCONF_MACHINE_ID is undefined
 # PTXCONF_MACHINE_ID_RC_ONCE is undefined
 PTXCONF_MBEDTLS=y
-PTXCONF_MBEDTLS_SERIES="series.pantavisor"
 # PTXCONF_MEMTEST is not set
 # PTXCONF_MEMTOOL is not set
 # PTXCONF_MICROCOM is undefined

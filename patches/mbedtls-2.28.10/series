@@ -1,2 +1,0 @@
-# Empty on purpose: without a series file PTXdist would apply every patch
-# here. The Pantavisor patch is in series.pantavisor (MBEDTLS_SERIES).

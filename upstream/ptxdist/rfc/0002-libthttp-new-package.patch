@@ -1,7 +1,7 @@
-From bafc94e497f22fb9cba253b829625fe276fdda3c Mon Sep 17 00:00:00 2001
+From 86a26785c6c083c7c46e54ff5b013d81d521cdb8 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 15:44:38 -0300
-Subject: [RFC PATCH 2/8] libthttp: new package
+Subject: [RFC PATCH 2/7] libthttp: new package
 
 libthttp is the small HTTP client Pantavisor uses to talk to Pantahub,
 on top of mbed TLS. Take the revision Pantavisor 031 builds, 76 commits
