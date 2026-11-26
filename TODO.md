@@ -27,7 +27,7 @@ Patches are based on PTXdist `master`, not on a release.
       unchanged on 21 Nov as f996777be. License now
       `Apache-2.0 OR GPL-2.0-or-later`. The
       pk_wrap.c patch (`patches/mbedtls-2.28.10/`) is Pantavisor-specific:
-      it goes in RFC 6/8 as a Pantavisor-only series (section 5).
+      it is RFC 5/8, a Pantavisor-only series (section 5).
 - [ ] **dropbear: make host key generation optional.** Sent 24 Nov 2026
       (`<20261124175844.453455-1-fernando.luiz@pantacor.com>`), no Cc;
       waiting for review. `upstream/ptxdist/0001-dropbear-make-host-key-generation-optional.patch`.
@@ -134,7 +134,7 @@ copied unchanged.
 
 ### Pantavisor-specific
 
-Decided 24 Nov 2026: these go into RFC 5/8 as a Pantavisor-only series
+Decided 24 Nov 2026: these go into RFC 4/8 as a Pantavisor-only series
 (`series.pantavisor`, `LXC_SERIES`), like busybox and dropbear, so they
 no longer need a config key to be safe for other builds. The reworks
 below still make them easier to argue for; `realpath_x()` has to be
@@ -248,10 +248,29 @@ the stock series. The pantavisor patch drops the unused
 | 2/8 | libthttp: new package | written (`0002-*`); certdata.txt from ca-certificates |
 | 3/8 | libevent22: new package (static, Pantavisor only) | written (`0003-*`) |
 | 4/8 | lxc: Pantavisor-only patch series | written (`0004-*`) |
-| 5/8 | mbedtls: Pantavisor-only patch series (`pk_wrap.c`) | to write |
+| 5/8 | mbedtls: Pantavisor-only patch series (`pk_wrap.c`) | written (`0005-*`) |
 | 6/8 | busybox: Pantavisor-only patch series | written (`0006-*`) |
 | 7/8 | dropbear: Pantavisor-only patch series | written (`0007-*`); needs the GENKEYS patch |
 | 8/8 | pantavisor: new package, with the initramfs layout | in this layer; adapt |
+
+- [x] **mbedtls (5/8)**: the meta-pantavisor `pk_wrap.c` patch, unchanged,
+      in `series.pantavisor` with an empty `series` and `MBEDTLS_SERIES`.
+      It lets the ECDSA verify callbacks retry a non-DER signature as raw
+      R || S, which is how JWS ES256 encodes it (RFC 7518 3.4) and what
+      Pantavisor's `signature.c` passes to `mbedtls_pk_verify()`. Built in
+      Docker; qemu-arm64 boots, both containers start, Pantahub online.
+      The factory revision is RSA-signed, so the boot test does not reach
+      the ECDSA fallback.
+- [ ] Test an ES256-signed revision with the patched mbedtls.
+- [ ] The patch will draw review comments: `ecdsa_verify_rs_wrap()`
+      `realloc()`s the caller's signature buffer (only built with
+      `MBEDTLS_ECP_RESTARTABLE`, off in PTXdist), the fallback tests
+      `ret & MBEDTLS_ERR_ECP_BAD_INPUT_DATA` (a bitwise AND of negative
+      error codes), `malloc()` is unchecked, and the file keeps its quilt
+      paths and `[PATCH 1/2]` subject.
+- [ ] Alternative: convert R || S to DER in Pantavisor's `signature.c`
+      before `mbedtls_pk_verify()` (about 30 lines); then stock mbedtls
+      works and 5/8 leaves the RFC.
 
 - [x] **picohttpparser**: upstream h2o/picohttpparser at 066d2b1 (what
       the Pantavisor fork is based on). Upstream has no build system for
