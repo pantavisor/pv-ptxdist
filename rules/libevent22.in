@@ -1,0 +1,25 @@
+## SECTION=system_libraries
+
+menuconfig LIBEVENT22
+	tristate
+	prompt "libevent 2.2 (static)         "
+	select LIBC_RT
+	select GCCLIBS_GCC_S
+	select MBEDTLS36
+	help
+	  libevent 2.2 with its mbed TLS bufferevent backend, which the
+	  libevent package (2.1) does not have, built against mbedtls36. Built as static libraries
+	  in a private sysroot prefix, /usr/lib/libevent-2.2, so it can
+	  coexist with libevent 2.1; nothing is installed on the target.
+	  Packages that need it, such as Pantavisor, add that prefix to
+	  their search paths.
+
+if LIBEVENT22
+
+config LIBEVENT22_DEBUG_MODE
+	bool
+	prompt "enable debug mode"
+	help
+	  Extra runtime checks for API misuse.
+
+endif

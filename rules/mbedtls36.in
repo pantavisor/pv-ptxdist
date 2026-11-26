@@ -1,0 +1,14 @@
+## SECTION=system_libraries
+
+config MBEDTLS36
+	tristate
+	prompt "mbedtls 3.6 (static)"
+	select HOST_CMAKE
+	select LIBC_PTHREAD
+	help
+	  mbed TLS 3.6 LTS for packages that do not support the mbedtls
+	  package's 4.x API yet, such as Pantavisor and libthttp. Built
+	  as static, position independent libraries in a private sysroot
+	  prefix, /usr/lib/mbedtls-3.6, so it can coexist with the
+	  mbedtls package; nothing is installed on the target. Packages
+	  that need it add that prefix to their search paths.

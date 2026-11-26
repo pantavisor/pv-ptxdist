@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Tue, 24 Nov 2026 17:10:08 -0300
+Subject: [PATCH] plugins/pv_lxc: drop the unused pv_export.h include
+
+Nothing in Pantavisor uses lxc_namespace_t or the LXC_NS_* values that
+lxc/pv_export.h declares, and it is the only reason Pantavisor's lxc
+fork installs that header. Without the include, Pantavisor builds
+against lxc with only the patches it needs.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ plugins/pv_lxc.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/plugins/pv_lxc.c b/plugins/pv_lxc.c
+index 10d2ecf8..add9c7eb 100644
+--- a/plugins/pv_lxc.c
++++ b/plugins/pv_lxc.c
+@@ -34,7 +34,6 @@
+ #include <sys/types.h>
+ #include <signal.h>
+ #include <lxc/lxccontainer.h>
+-#include <lxc/pv_export.h>
+ #include <limits.h>
+ #include <unistd.h>
+ #include <stdbool.h>

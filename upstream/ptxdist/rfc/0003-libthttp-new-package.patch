@@ -1,0 +1,293 @@
+From 4ad88980cfdf18e16be81530c6fb0409a9e794ee Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Tue, 24 Nov 2026 15:44:38 -0300
+Subject: [RFC PATCH 3/8] libthttp: new package
+
+libthttp is the small HTTP client Pantavisor uses to talk to Pantahub,
+on top of mbed TLS. Take the revision Pantavisor 031 builds, 76 commits
+after the last tag (011), which adds the certificate denylist 031 uses.
+
+The library is static, with position-independent code, as Pantavisor
+links it into its executables and a plugin. It links mbedtls36: a patch
+makes it build with mbed TLS 3.6 as well as 2.28, but not 4.x yet. Its
+CMakeLists.txt finds MBEDTLS_INCLUDE_DIRS but passes MBEDTLS_INCLUDE_DIR
+on, so the include path goes into CPPFLAGS too.
+
+What goes on the target is the trust store, /etc/thttp/certs: only the
+roots in LIBTHTTP_CA_CERTS, extracted from ca-certificates'
+certdata.txt with its certdata2pem.py, so that an initramfs does not
+carry the whole bundle. The default is the set meta-pantavisor uses:
+the roots of Let's Encrypt, DigiCert, Sectigo, GlobalSign, Google Trust
+Services and Amazon. Every file must parse with mbed TLS, or Pantavisor
+refuses the whole directory.
+
+The certificates are MPL-2.0, hence MIT AND MPL-2.0.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ ...ld-with-mbed-TLS-3.6-as-well-as-2.28.patch |  90 +++++++++++++++
+ patches/libthttp-011-76-gff79603fc178/series  |   1 +
+ rules/libthttp.in                             |  30 +++++
+ rules/libthttp.make                           | 108 ++++++++++++++++++
+ 4 files changed, 229 insertions(+)
+ create mode 100644 patches/libthttp-011-76-gff79603fc178/0001-build-with-mbed-TLS-3.6-as-well-as-2.28.patch
+ create mode 100644 patches/libthttp-011-76-gff79603fc178/series
+ create mode 100644 rules/libthttp.in
+ create mode 100644 rules/libthttp.make
+
+diff --git a/patches/libthttp-011-76-gff79603fc178/0001-build-with-mbed-TLS-3.6-as-well-as-2.28.patch b/patches/libthttp-011-76-gff79603fc178/0001-build-with-mbed-TLS-3.6-as-well-as-2.28.patch
+new file mode 100644
+index 000000000..e5c950a3b
+--- /dev/null
++++ b/patches/libthttp-011-76-gff79603fc178/0001-build-with-mbed-TLS-3.6-as-well-as-2.28.patch
+@@ -0,0 +1,90 @@
++From 20d70d841baf98b5088070b47fe733e39c37f066 Mon Sep 17 00:00:00 2001
++From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++Date: Thu, 26 Nov 2026 17:55:58 -0300
++Subject: [PATCH] build with mbed TLS 3.6 as well as 2.28
++
++mbed TLS 2.28 is end of life, and distributions move on: PTXdist now
++ships 4.x and keeps 3.6 LTS for packages like this one. Build with 3.6
++while still building with 2.28:
++
++ - mbedtls/config.h is gone in 3.x; mbedtls/version.h pulls in the
++   configuration, MBEDTLS_CONFIG_FILE included, in both.
++ - mbedtls/net.h became mbedtls/net_sockets.h, which 2.28 has too.
++ - mbedtls/certs.h (the test certificates) is gone and was unused.
++ - mbedtls_sha256_ret() is mbedtls_sha256() in 3.x.
++
++TLS 1.3, on by default in 3.6, needs PSA crypto; 3.6 initializes it
++during the handshake itself, so no psa_crypto_init() call is added.
++
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ thttp-denylist.c |  8 ++++++--
++ thttp.c          | 10 +++-------
++ 2 files changed, 9 insertions(+), 9 deletions(-)
++
++diff --git a/thttp-denylist.c b/thttp-denylist.c
++index b3cf03f..a4e263b 100644
++--- a/thttp-denylist.c
+++++ b/thttp-denylist.c
++@@ -1,4 +1,4 @@
++-#include "mbedtls/config.h"
+++#include "mbedtls/version.h"
++ 
++ #include <ctype.h>
++ #include <stdio.h>
++@@ -7,6 +7,10 @@
++ 
++ #include "mbedtls/sha256.h"
++ 
+++#if MBEDTLS_VERSION_NUMBER < 0x03000000
+++#define mbedtls_sha256 mbedtls_sha256_ret
+++#endif
+++
++ #include "thttp-denylist.h"
++ 
++ #define HASH_LEN 32
++@@ -145,7 +149,7 @@ int thttp_denylist_contains(const thttp_denylist_t *dl, const mbedtls_x509_crt *
++ 
++ 	if (!dl || !dl->count || !crt || !crt->pk_raw.p || !crt->pk_raw.len)
++ 		return 0;
++-	if (mbedtls_sha256_ret(crt->pk_raw.p, crt->pk_raw.len, h, 0))
+++	if (mbedtls_sha256(crt->pk_raw.p, crt->pk_raw.len, h, 0))
++ 		return 0;
++ 	return bsearch(h, dl->hashes, dl->count, HASH_LEN, hash_cmp) != NULL;
++ }
++diff --git a/thttp.c b/thttp.c
++index cdad2e4..ee30da4 100644
++--- a/thttp.c
+++++ b/thttp.c
++@@ -20,11 +20,8 @@
++  * SOFTWARE.
++  */
++ 
++-#if !defined(MBEDTLS_CONFIG_FILE)
++-#include "mbedtls/config.h"
++-#else
++-#include MBEDTLS_CONFIG_FILE
++-#endif
+++/* Pulls in the configuration (MBEDTLS_CONFIG_FILE too) in 2.x and 3.x. */
+++#include "mbedtls/version.h"
++ 
++ #if defined(MBEDTLS_PLATFORM_C)
++ #include "mbedtls/platform.h"
++@@ -37,13 +34,12 @@
++ #define mbedtls_printf    printf
++ #endif
++ 
++-#include "mbedtls/net.h"
+++#include "mbedtls/net_sockets.h"
++ #include "mbedtls/debug.h"
++ #include "mbedtls/ssl.h"
++ #include "mbedtls/entropy.h"
++ #include "mbedtls/ctr_drbg.h"
++ #include "mbedtls/error.h"
++-#include "mbedtls/certs.h"
++ #include "mbedtls/x509_crt.h"
++ 
++ 
++-- 
++2.43.0
++
+diff --git a/patches/libthttp-011-76-gff79603fc178/series b/patches/libthttp-011-76-gff79603fc178/series
+new file mode 100644
+index 000000000..8ac37c119
+--- /dev/null
++++ b/patches/libthttp-011-76-gff79603fc178/series
+@@ -0,0 +1 @@
++0001-build-with-mbed-TLS-3.6-as-well-as-2.28.patch
+diff --git a/rules/libthttp.in b/rules/libthttp.in
+new file mode 100644
+index 000000000..4f4e2de2a
+--- /dev/null
++++ b/rules/libthttp.in
+@@ -0,0 +1,30 @@
++## SECTION=system_libraries
++
++config LIBTHTTP
++	tristate
++	prompt "libthttp"
++	select HOST_CMAKE
++	select MBEDTLS36
++	select HOST_SYSTEM_PYTHON3
++	help
++	  Tiny HTTP/REST client library used by Pantavisor to talk to
++	  Pantahub. The library itself is static; only the TLS root
++	  certificates are installed on the target.
++
++config LIBTHTTP_CA_CERTS
++	string
++	depends on LIBTHTTP
++	prompt "TLS root certificates"
++	default "ISRG_Root_X1 ISRG_Root_X2 DigiCert_Global_Root_G2 DigiCert_Global_Root_G3 DigiCert_TLS_RSA4096_Root_G5 DigiCert_TLS_ECC_P384_Root_G5 USERTrust_RSA_Certification_Authority USERTrust_ECC_Certification_Authority COMODO_RSA_Certification_Authority COMODO_ECC_Certification_Authority Sectigo_Public_Server_Authentication_Root_R46 Sectigo_Public_Server_Authentication_Root_E46 GlobalSign_Root_CA_-_R3 GlobalSign_Root_CA_-_R6 GlobalSign_ECC_Root_CA_-_R4 GlobalSign_ECC_Root_CA_-_R5 GlobalSign_Root_R46 GlobalSign_Root_E46 GTS_Root_R1 GTS_Root_R3 GTS_Root_R4 Amazon_Root_CA_1 Amazon_Root_CA_2 Amazon_Root_CA_3 Amazon_Root_CA_4"
++	help
++	  Root CAs installed to /etc/thttp/certs, the trust store
++	  Pantavisor uses for HTTPS (PV_LIBTHTTP_CERTSDIR). Names are
++	  certificate labels from the Mozilla list, with spaces as
++	  underscores, as PTXdist's ca-certificates package writes them.
++	  Every file must parse with mbed TLS, or Pantavisor refuses the
++	  whole directory.
++
++	  The default is the roots of Let's Encrypt (ISRG), DigiCert,
++	  Sectigo, GlobalSign, Google Trust Services and Amazon, the same
++	  set as meta-pantavisor's PV_TLS_CA_CERTS. A name missing from
++	  the list is skipped with a warning.
+diff --git a/rules/libthttp.make b/rules/libthttp.make
+new file mode 100644
+index 000000000..6cd6598dc
+--- /dev/null
++++ b/rules/libthttp.make
+@@ -0,0 +1,108 @@
++# -*-makefile-*-
++#
++# Copyright (C) 2026 by Fernando Luiz Cola <fernando.luiz@pantacor.com>
++#
++# For further information about the PTXdist project and license conditions
++# see the README file.
++#
++
++#
++# We provide this package
++#
++PACKAGES-$(PTXCONF_LIBTHTTP) += libthttp
++
++#
++# Paths and names
++#
++# The revision meta-pantavisor builds: 76 commits after the last tag (011).
++LIBTHTTP_VERSION	:= 011-76-gff79603fc178
++LIBTHTTP_SHA256		:= 98452b92c86a211bbb4fe8790c04f344f3cf0274b816da58bd2d51e6fb745f4f
++LIBTHTTP		:= libthttp-$(LIBTHTTP_VERSION)
++LIBTHTTP_SUFFIX		:= tar.gz
++LIBTHTTP_URL		:= git+https://github.com/pantavisor/libthttp.git;tag=$(LIBTHTTP_VERSION)
++LIBTHTTP_SOURCE		:= $(SRCDIR)/$(LIBTHTTP).$(LIBTHTTP_SUFFIX)
++LIBTHTTP_DIR		:= $(BUILDDIR)/$(LIBTHTTP)
++LIBTHTTP_LICENSE	:= MIT AND MPL-2.0
++LIBTHTTP_LICENSE_FILES	:= \
++	file://LICENSE;md5=bd0a4fad56a916f12a1c3cedb3976612
++
++# The root CAs come from ca-certificates' certdata.txt, but the whole bundle
++# is not installed: the initramfs only gets the roots in LIBTHTTP_CA_CERTS.
++# The part has no _DIR, so PTXdist downloads and checks it without
++# extracting it. The certificates on the target are MPL-2.0, hence the
++# package license.
++LIBTHTTP_CERTDATA_SHA256	 = $(CA_CERTIFICATES_SHA256)
++LIBTHTTP_CERTDATA_URL		 = $(CA_CERTIFICATES_URL)
++LIBTHTTP_CERTDATA_SOURCE	 = $(CA_CERTIFICATES_SOURCE)
++LIBTHTTP_PARTS			+= LIBTHTTP_CERTDATA
++
++# ----------------------------------------------------------------------------
++# Prepare
++# ----------------------------------------------------------------------------
++
++# mbedtls36's private prefix (MBEDTLS36_PREFIX), spelled out because rule
++# files are not included in a fixed order. The include path goes into
++# CPPFLAGS as well: CMakeLists.txt finds MBEDTLS_INCLUDE_DIRS but passes
++# MBEDTLS_INCLUDE_DIR to include_directories().
++LIBTHTTP_MBEDTLS_PREFIX	:= /usr/lib/mbedtls-3.6
++LIBTHTTP_CPPFLAGS	:= -I$(PTXDIST_SYSROOT_TARGET)$(LIBTHTTP_MBEDTLS_PREFIX)/include
++
++# Static library linked into Pantavisor's executables and its pv_lxc.so
++# plugin, hence PIC.
++LIBTHTTP_CONF_TOOL	:= cmake
++LIBTHTTP_CONF_OPT	:= \
++	$(CROSS_CMAKE_USR) \
++	-DCMAKE_PREFIX_PATH=$(LIBTHTTP_MBEDTLS_PREFIX) \
++	-DCMAKE_POSITION_INDEPENDENT_CODE=ON
++
++# ----------------------------------------------------------------------------
++# Install
++# ----------------------------------------------------------------------------
++
++LIBTHTTP_CERTS_DIR	:= $(LIBTHTTP_DIR)-certdata
++LIBTHTTP_CA_CERTS	:= $(call remove_quotes, $(PTXCONF_LIBTHTTP_CA_CERTS))
++
++$(STATEDIR)/libthttp.install:
++	@$(call targetinfo)
++	@$(call world/install, LIBTHTTP)
++	@rm -rf $(LIBTHTTP_CERTS_DIR) $(LIBTHTTP_PKGDIR)/etc/thttp/certs
++	@mkdir -p $(LIBTHTTP_CERTS_DIR) $(LIBTHTTP_PKGDIR)/etc/thttp/certs
++	@cp $(LIBTHTTP_CERTDATA_SOURCE) $(LIBTHTTP_CERTS_DIR)/certdata.txt
++	@cd $(LIBTHTTP_CERTS_DIR) && \
++		python3 $(CA_CERTIFICATES_CERTDATA2PEM) > /dev/null
++	@found=0; \
++	for name in $(LIBTHTTP_CA_CERTS); do \
++		if [ -f "$(LIBTHTTP_CERTS_DIR)/$${name}.crt" ]; then \
++			install -m 0644 "$(LIBTHTTP_CERTS_DIR)/$${name}.crt" \
++				$(LIBTHTTP_PKGDIR)/etc/thttp/certs/; \
++			found=$$((found + 1)); \
++		else \
++			echo "warning: LIBTHTTP_CA_CERTS: $${name} is not in $(CA_CERTIFICATES_VERSION), skipping" >&2; \
++		fi; \
++	done; \
++	if [ $${found} -eq 0 ]; then \
++		echo "error: LIBTHTTP_CA_CERTS: no root certificate installed" >&2; \
++		exit 1; \
++	fi
++	@$(call touch)
++
++# ----------------------------------------------------------------------------
++# Target-Install
++# ----------------------------------------------------------------------------
++
++$(STATEDIR)/libthttp.targetinstall:
++	@$(call targetinfo)
++
++	@$(call install_init, libthttp)
++	@$(call install_fixup, libthttp,PRIORITY,optional)
++	@$(call install_fixup, libthttp,SECTION,base)
++	@$(call install_fixup, libthttp,AUTHOR,"Fernando Luiz Cola <fernando.luiz@pantacor.com>")
++	@$(call install_fixup, libthttp,DESCRIPTION,"libthttp TLS root certificates")
++
++	@$(call install_tree, libthttp, 0, 0, -, /etc/thttp/certs)
++
++	@$(call install_finish, libthttp)
++
++	@$(call touch)
++
++# vim: syntax=make
+-- 
+2.43.0
+

@@ -1,0 +1,2 @@
+# No patches: lxc.tty.min, formerly carried here, is now on the fork branch.
+# The directory is kept for autogen.sh.

@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Sat, 17 Jan 2026 13:36:25 +0000
+Subject: [PATCH] support /exports mounts for Pantavisor
+
+Skip unmounting /exports during chroot and preserve shared mount
+propagation for exports mounts. This is needed for Pantavisor's
+exports mechanism where containers can expose directories to
+other containers.
+---
+ src/lxc/conf.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/lxc/conf.c b/src/lxc/conf.c
+index 99360dbe9..c0bd87699 100644
+--- a/src/lxc/conf.c
++++ b/src/lxc/conf.c
+@@ -1315,6 +1315,9 @@ static int lxc_chroot(const struct lxc_rootfs *rootfs)
+ 			if (strequal(slider1 + 1, "/proc"))
+ 				continue;
+ 
++			if (strnequal(slider1 + 1, "/exports", 8))
++				continue;
++
+ 			ret = umount2(slider1, MNT_DETACH);
+ 			if (ret == 0)
+ 				progress++;
+@@ -3476,7 +3479,7 @@ static void turn_into_dependent_mounts(const struct lxc_rootfs *rootfs)
+ 			continue;
+ 
+ 		null_endofword(opts);
+-		if (!strstr(opts, "shared"))
++		if (!strstr(opts, "shared") || strstr(target, "exports"))
+ 			continue;
+ 
+ 		null_endofword(target);

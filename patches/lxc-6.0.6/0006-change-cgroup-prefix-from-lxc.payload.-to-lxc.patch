@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Sat, 17 Jan 2026 13:28:43 +0000
+Subject: [PATCH] change cgroup prefix from lxc.payload. to lxc/
+
+Pantavisor expects container cgroups under "lxc/<name>" rather than
+"lxc.payload.<name>". This change reverts the upstream prefix change
+to maintain compatibility with the Pantavisor cgroup hierarchy.
+---
+ src/lxc/cgroups/cgroup.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/lxc/cgroups/cgroup.h b/src/lxc/cgroups/cgroup.h
+index 108e5d84e..a69239265 100644
+--- a/src/lxc/cgroups/cgroup.h
++++ b/src/lxc/cgroups/cgroup.h
+@@ -18,7 +18,7 @@
+ 
+ #define DEFAULT_CGROUP_MOUNTPOINT_RELATIVE "sys/fs/cgroup"
+ #define DEFAULT_CGROUP_MOUNTPOINT "/sys/fs/cgroup"
+-#define DEFAULT_PAYLOAD_CGROUP_PREFIX "lxc.payload."
++#define DEFAULT_PAYLOAD_CGROUP_PREFIX "lxc/"
+ #define DEFAULT_MONITOR_CGROUP_PREFIX "lxc.monitor."
+ #define DEFAULT_PAYLOAD_CGROUP "payload"
+ #define DEFAULT_MONITOR_CGROUP "monitor"

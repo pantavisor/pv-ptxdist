@@ -3,13 +3,16 @@
 menuconfig PANTAVISOR
 	tristate
 	prompt "pantavisor                    "
+	# /media is a link into /run/pantavisor (see pantavisor.make)
+	depends on !ROOTFS_MEDIA
 	select HOST_CMAKE
 	select LIBTHTTP
 	select PICOHTTPPARSER
-	select MBEDTLS_PV
-	select LXC_PV
+	select MBEDTLS36
+	select LXC				if PANTAVISOR_LXC_STABLE
+	select LXC_PV				if PANTAVISOR_LXC_DEPRECATED
 	select ZLIB
-	select LIBEVENT_PV
+	select LIBEVENT22
 	select LIBC_DL
 	select LIBC_PTHREAD
 	select BUSYBOX_MDEV			if RUNTIME
@@ -33,52 +36,112 @@ menuconfig PANTAVISOR
 	help
 	  Pantavisor: container-based init and update agent for embedded
 	  Linux. Built in "embedded" mode, i.e. it runs as PID 1 from the
-	  initramfs (/init -> /usr/bin/pantavisor).
+	  initramfs (/init -> /usr/bin/pantavisor). Also installs the
+	  initramfs layout Pantavisor expects: /storage, /volumes,
+	  /exports and /writable, and /pv, /media and /configs as links
+	  into /run/pantavisor.
 
 if PANTAVISOR
 
+choice
+	prompt "LXC runtime"
+	default PANTAVISOR_LXC_STABLE
+
+config PANTAVISOR_LXC_STABLE
+	bool
+	prompt "LXC 6"
+	help
+	  LXC 6.0 LTS with the Pantavisor patches (series.pantavisor). Pantavisor picks the
+	  cgroup version itself (PV_SYSTEM_CGROUP_VERSION=auto): cgroup
+	  v2 when the kernel has cgroup BPF, v1 otherwise.
+
+config PANTAVISOR_LXC_DEPRECATED
+	bool
+	prompt "LXC 3 (lxc-pv, deprecated)"
+	help
+	  The old LXC 3.0 fork, for systems that still need it. It only
+	  supports cgroup v1, so Pantavisor is set to
+	  PV_SYSTEM_CGROUP_VERSION=1.
+
+endchoice
+
 config PANTAVISOR_DEBUG
 	bool
-	default y
 	prompt "debug build"
 	help
-	  -DPANTAVISOR_DEBUG=ON: enables the debug shell and extra
-	  logging. Not for production. On by default, as in
-	  meta-pantavisor (PANTAVISOR_FEATURES has "debug").
+	  Build with PANTAVISOR_DEBUG: a debug shell on the console and
+	  the debug SSH server on port 8222, plus extra logging. Not for
+	  production. The SSH server needs DROPBEAR, with DROPBEAR_GENKEYS
+	  off: Pantavisor starts it with -R.
+
+config PANTAVISOR_DEVELOPER_TRUST
+	bool
+	prompt "install the developer trust store"
+	help
+	  Install Pantavisor's developer certificates, "Pantavisor Dev
+	  CA" and "Pantacor Dev CA (OEM Root)", to
+	  /etc/pantavisor/pvs/trust. Pantavisor then accepts revisions
+	  signed with the development keys published for pvr, which
+	  anyone can use. Not for production: there, leave this off and
+	  install the product's own trust store to
+	  /etc/pantavisor/pvs/trust.
 
 config PANTAVISOR_DM_CRYPT
 	bool
 	prompt "dm-crypt volume support"
+	help
+	  Mount encrypted (dm-crypt) volumes. Installs cryptsetup,
+	  dmsetup and keyutils.
 
 config PANTAVISOR_DM_VERITY
 	bool
 	prompt "dm-verity volume support"
+	help
+	  Mount integrity-checked (dm-verity) volumes and turn on the
+	  secure boot handlers (PV_SECUREBOOT_HANDLERS) that check them.
+	  Installs cryptsetup's veritysetup and dmsetup.
 
 config PANTAVISOR_E2FSGROW
 	bool
 	prompt "grow storage partition on first boot"
 	default y
 	help
-	  pv_e2fsgrow uses busybox fdisk on MBR disks and sgdisk on GPT
-	  disks.
+	  Grow the storage partition and its ext4 file system to the end
+	  of the disk on first boot. pv_e2fsgrow uses busybox fdisk on
+	  MBR disks and sgdisk on GPT disks.
 
 config PANTAVISOR_PVCONTROL
 	bool
 	prompt "install pvcontrol and pvcurl"
 	default y
+	help
+	  pvcontrol is the command line client for Pantavisor's local
+	  control socket (status, metadata, updates); pvcurl is the
+	  small HTTP-over-Unix-socket client it uses.
 
 config PANTAVISOR_PVTX
 	bool
 	prompt "install pvtx"
 	default y
+	help
+	  pvtx creates, modifies and installs revisions locally through
+	  the control socket, with atomic commit and rollback. Also
+	  installs libpvtx.
 
 config PANTAVISOR_XCONNECT
 	bool
 	prompt "build pv-xconnect"
+	help
+	  pv-xconnect mediates services between containers: providers
+	  declare what they expose, consumers what they need, and
+	  Pantavisor injects the resources into the consumer.
 
 config PANTAVISOR_DEBUG_HOOKS
 	bool
 	prompt "install debug system hooks"
 	depends on PANTAVISOR_DEBUG
+	help
+	  Install a system hook that runs per-revision debug
+	  configuration from the storage, for testing hooks.
 
 endif

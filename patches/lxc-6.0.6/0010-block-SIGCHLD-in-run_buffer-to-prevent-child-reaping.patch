@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Sat, 17 Jan 2026 13:36:54 +0000
+Subject: [PATCH] block SIGCHLD in run_buffer to prevent child reaping issues
+
+Block SIGCHLD during the lxc_popen/lxc_pclose critical section to
+prevent the parent process (e.g., Pantavisor) from reaping the child
+before lxc_pclose() can retrieve its exit status.
+
+This replaces the earlier setpgrp() approach which was insufficient.
+---
+ src/lxc/start.c |  3 ++-
+ src/lxc/utils.c | 16 ++++++++++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/src/lxc/start.c b/src/lxc/start.c
+index b7ce830ca..3d7a61a28 100644
+--- a/src/lxc/start.c
++++ b/src/lxc/start.c
+@@ -1362,7 +1362,8 @@ static int do_start(void *data)
+ 	if (ret < 0)
+ 		goto out_warn_father;
+ 
+-	{
++	/* Set container= env var unless type is "pv-root" (Pantavisor root platform) */
++	if (!handler->conf->type || !strequal(handler->conf->type, "pv-root")) {
+ 		const char *container_type = handler->conf->type ? handler->conf->type : "lxc";
+ 		char *container_env = must_make_path("container=", container_type, NULL);
+ 		ret = putenv(container_env);
+diff --git a/src/lxc/utils.c b/src/lxc/utils.c
+index 1e41d642a..c4712f046 100644
+--- a/src/lxc/utils.c
++++ b/src/lxc/utils.c
+@@ -536,6 +536,18 @@ static int run_buffer(char *buffer)
+ 	__do_free char *output = NULL;
+ 	__do_lxc_pclose struct lxc_popen_FILE *f = NULL;
+ 	int fd, ret;
++	sigset_t set, oldset;
++
++	/*
++	 * Block SIGCHLD to prevent the parent process from reaping
++	 * the child before lxc_pclose() can do so. This is needed when
++	 * LXC is used as a library (e.g., by Pantavisor).
++	 */
++	sigemptyset(&set);
++	sigaddset(&set, SIGCHLD);
++	ret = pthread_sigmask(SIG_BLOCK, &set, &oldset);
++	if (ret != 0)
++		SYSWARN("Failed to block SIGCHLD");
+ 
+ 	f = lxc_popen(buffer);
+ 	if (!f)
+@@ -563,6 +575,10 @@ static int run_buffer(char *buffer)
+ 	}
+ 
+ 	ret = lxc_pclose(move_ptr(f));
++
++	/* Restore the original signal mask */
++	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
++
+ 	if (ret == -1)
+ 		return log_error_errno(-1, errno, "Script exited with error");
+ 	else if (WIFEXITED(ret) && WEXITSTATUS(ret) != 0)

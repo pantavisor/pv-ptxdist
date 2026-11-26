@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alexander Sack <asac@pantacor.com>
+Date: Sat, 17 Jan 2026 13:30:08 +0000
+Subject: [PATCH] support hook commands with parameters
+
+Allow start hooks to include command-line parameters, e.g.:
+  lxc.hook.start = /usr/bin/script.sh arg1 arg2
+
+The verification now extracts just the command name (before any space)
+to check for file existence, while preserving the full command line
+for execution.
+---
+ src/lxc/conf.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/lxc/conf.c b/src/lxc/conf.c
+index bf2695158..99360dbe9 100644
+--- a/src/lxc/conf.c
++++ b/src/lxc/conf.c
+@@ -3541,10 +3541,22 @@ static bool verify_start_hooks(struct lxc_conf *conf)
+ 	list_for_each_entry(hook, &conf->hooks[LXCHOOK_START], head) {
+ 		int ret;
+ 		char *hookname = hook->val;
++		char *cmdend, sav = '\0';
++
++		/* Extract command name without parameters for access check */
++		cmdend = strchr(hookname, ' ');
++		if (cmdend) {
++			sav = *cmdend;
++			*cmdend = '\0';
++		}
+ 
+ 		ret = strnprintf(path, sizeof(path), "%s%s",
+ 			       conf->rootfs.path ? conf->rootfs.mount : "",
+ 			       hookname);
++
++		if (cmdend)
++			*cmdend = sav;
++
+ 		if (ret < 0)
+ 			return false;
+ 

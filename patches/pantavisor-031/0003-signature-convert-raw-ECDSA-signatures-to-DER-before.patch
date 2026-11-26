@@ -1,0 +1,126 @@
+From 25e49a60c858242984907188487f0b1ea69d361d Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Thu, 26 Nov 2026 17:04:04 -0300
+Subject: [PATCH] signature: convert raw ECDSA signatures to DER before
+ verifying
+
+JWS ES256, ES384 and ES512 signatures are the raw R || S pair
+(RFC 7518, section 3.4), but mbedtls_pk_verify() only accepts an ASN.1
+DER sequence, so stock mbedtls rejects them with
+MBEDTLS_ERR_ECP_BAD_INPUT_DATA. meta-pantavisor worked around this by
+patching mbedtls' pk_wrap.c to retry a failed signature as R || S,
+which relaxes signature parsing for every mbedtls user.
+
+Convert the signature in Pantavisor instead, with mbedtls' ASN.1 writer.
+A raw signature is exactly twice the curve size and a DER one is always
+longer, so DER signatures, and RSA ones, pass through unchanged, and
+stock mbedtls is enough.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ signature.c | 73 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
+
+diff --git a/signature.c b/signature.c
+index 4e3d3ef0..d0ba1aa0 100644
+--- a/signature.c
++++ b/signature.c
+@@ -27,8 +27,12 @@
+ #include <stdlib.h>
+ #include <stdbool.h>
+ #include <stdio.h>
++#include <string.h>
+ #include <libgen.h>
+ #include <fnmatch.h>
++#include <mbedtls/asn1write.h>
++#include <mbedtls/bignum.h>
++#include <mbedtls/ecdsa.h>
+ #include <mbedtls/pk.h>
+ #include <mbedtls/x509_crt.h>
+ #include <mbedtls/oid.h>
+@@ -773,6 +777,69 @@ out:
+ 	return ret;
+ }
+ 
++/*
++ * JWS ES256/384/512 signatures are the raw R || S pair (RFC 7518, 3.4),
++ * while mbedtls_pk_verify() takes an ASN.1 DER sequence. A raw signature is
++ * exactly twice the curve size and a DER one is always longer, so DER
++ * signatures pass through unchanged.
++ */
++static int pv_signature_ecdsa_raw_to_der(mbedtls_pk_context *pk,
++					 unsigned char **sig, size_t *sig_len)
++{
++	size_t n = (mbedtls_pk_get_bitlen(pk) + 7) / 8;
++	unsigned char buf[MBEDTLS_ECDSA_MAX_LEN];
++	unsigned char *p = buf + sizeof(buf), *der;
++	mbedtls_mpi r, s;
++	size_t len = 0;
++	int ret;
++
++	if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_ECDSA) || *sig_len != 2 * n)
++		return 0;
++
++	mbedtls_mpi_init(&r);
++	mbedtls_mpi_init(&s);
++
++	ret = mbedtls_mpi_read_binary(&r, *sig, n);
++	if (ret)
++		goto out;
++	ret = mbedtls_mpi_read_binary(&s, *sig + n, n);
++	if (ret)
++		goto out;
++
++	ret = mbedtls_asn1_write_mpi(&p, buf, &s);
++	if (ret < 0)
++		goto out;
++	len += ret;
++	ret = mbedtls_asn1_write_mpi(&p, buf, &r);
++	if (ret < 0)
++		goto out;
++	len += ret;
++	ret = mbedtls_asn1_write_len(&p, buf, len);
++	if (ret < 0)
++		goto out;
++	len += ret;
++	ret = mbedtls_asn1_write_tag(
++		&p, buf, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
++	if (ret < 0)
++		goto out;
++	len += ret;
++
++	der = malloc(len);
++	if (!der) {
++		ret = -1;
++		goto out;
++	}
++	memcpy(der, p, len);
++	free(*sig);
++	*sig = der;
++	*sig_len = len;
++	ret = 0;
++out:
++	mbedtls_mpi_free(&r);
++	mbedtls_mpi_free(&s);
++	return ret;
++}
++
+ static bool pv_signature_verify_sha(const char *payload,
+ 				    struct dl_list *certs_raw,
+ 				    struct pv_signature *signature,
+@@ -856,6 +923,12 @@ static bool pv_signature_verify_sha(const char *payload,
+ 
+ 	pv_log(DEBUG, "signature length is %zd", olen);
+ 
++	if (pv_signature_ecdsa_raw_to_der(pk, (unsigned char **)&sig_decoded,
++					  &olen)) {
++		pv_log(ERROR, "ECDSA signature could not be converted to DER");
++		goto out;
++	}
++
+ 	res = mbedtls_pk_verify(pk, mdtype, hash, 0,
+ 				(unsigned char *)sig_decoded, olen);
+ 	if (res) {
+-- 
+2.43.0
+

@@ -1,0 +1,917 @@
+From 1293e5ef478cb49d75216e1bb7104634c0f6b779 Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Tue, 24 Nov 2026 10:28:06 -0300
+Subject: [RFC PATCH 6/8] busybox: add a Pantavisor-only patch series
+
+Pantavisor needs six busybox changes, all from its busybox-pv fork
+(github.com/pantavisor/busybox-pv), rebased onto 1.38.0:
+
+ - nsenter: --caps to adopt the target's capabilities, and -C/--cgroup
+ - mdev: FOLLOW_X_ROOT and MDEV_CONF, so an mdev daemon can serve the
+   /dev of a container root and follow its pivot root
+ - netlink: do not bind with a pid that may not be unique
+ - mdev: MODALIAS support, loading PCI drivers during 'mdev -s', and a
+   fix for the segfault it caused with name rules in mdev.conf
+
+The MODALIAS scan has no Kconfig switch and would change 'mdev -s' for
+everyone, and the rest only matters to Pantavisor. So the patches go
+into series.pantavisor, next to the unchanged series, and a hidden
+BUSYBOX_SERIES picks it when PANTAVISOR is enabled. PTXdist already
+reads <PKG>_SERIES for every package; this is the first user besides
+the kernel. Builds without Pantavisor apply the same patches as before.
+
+BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT goes into rules/busybox.in, as
+config/busybox mirrors stock busybox's Kconfig.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ ...s-to-adopt-the-target-s-capabilities.patch | 176 ++++++++++++
+ ...-cgroup-option-similar-to-util-linux.patch | 110 ++++++++
+ ...-support-FOLLOW_X_ROOT-and-MDEV_CONF.patch | 163 +++++++++++
+ ...ind_to_netlink-setting-sa.nl_pid-to-.patch |  25 ++
+ ...ALIAS-support-loading-pci-bus-driver.patch | 253 ++++++++++++++++++
+ ...-name-rules-for-modalias-only-device.patch |  53 ++++
+ patches/busybox-1.38.0/series.pantavisor      |  18 ++
+ rules/busybox.in                              |  19 ++
+ 8 files changed, 817 insertions(+)
+ create mode 100644 patches/busybox-1.38.0/0300-nsenter-add-caps-to-adopt-the-target-s-capabilities.patch
+ create mode 100644 patches/busybox-1.38.0/0301-nsenter-add-C-cgroup-option-similar-to-util-linux.patch
+ create mode 100644 patches/busybox-1.38.0/0302-mdev-support-FOLLOW_X_ROOT-and-MDEV_CONF.patch
+ create mode 100644 patches/busybox-1.38.0/0303-fix-create_and_bind_to_netlink-setting-sa.nl_pid-to-.patch
+ create mode 100644 patches/busybox-1.38.0/0304-Improve-mdev-MODALIAS-support-loading-pci-bus-driver.patch
+ create mode 100644 patches/busybox-1.38.0/0305-mdev-don-t-match-name-rules-for-modalias-only-device.patch
+ create mode 100644 patches/busybox-1.38.0/series.pantavisor
+
+diff --git a/patches/busybox-1.38.0/0300-nsenter-add-caps-to-adopt-the-target-s-capabilities.patch b/patches/busybox-1.38.0/0300-nsenter-add-caps-to-adopt-the-target-s-capabilities.patch
+new file mode 100644
+index 000000000..c61b02a59
+--- /dev/null
++++ b/patches/busybox-1.38.0/0300-nsenter-add-caps-to-adopt-the-target-s-capabilities.patch
+@@ -0,0 +1,176 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Mon, 1 Nov 2021 13:01:10 +0100
++Subject: [PATCH 300/305] nsenter: add --caps to adopt the target's
++ capabilities
++
++With --target, read the target process' capabilities before switching
++namespaces and drop from the bounding set whatever it does not hold.
++
++[fernando: squashed "add --caps flag to make nsenter also adopt the same
++ caps that the target process holds" and "fix capget to be run before
++ switching namespaces". Keep -F a flag (the series had made it take
++ an optional argument), document -c, build capability.c for nsenter
++ alone, and drop the unused and commented-out securebits code.]
++(cherry picked from commit 0166864efe7903b57cec70744ea3f0dd551b7208)
++(cherry picked from commit c18302ac03f3476cab3df94b3d4467fff63db025)
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ include/libbb.h      |  2 +-
++ libbb/capability.c   |  1 +
++ util-linux/nsenter.c | 68 ++++++++++++++++++++++++++++++++++++++++++--
++ 3 files changed, 68 insertions(+), 3 deletions(-)
++
++diff --git a/include/libbb.h b/include/libbb.h
++index 37f9da5..82aa043 100644
++--- a/include/libbb.h
+++++ b/include/libbb.h
++@@ -1865,7 +1865,7 @@ void exec_prog_or_SHELL(char **argv) NORETURN FAST_FUNC;
++  */
++ const char *get_shell_name(void) FAST_FUNC;
++ 
++-#if ENABLE_FEATURE_SETPRIV_CAPABILITIES || ENABLE_RUN_INIT
+++#if ENABLE_FEATURE_SETPRIV_CAPABILITIES || ENABLE_RUN_INIT || ENABLE_NSENTER
++ unsigned cap_name_to_number(const char *cap) FAST_FUNC;
++ void printf_cap(const char *pfx, unsigned cap_no) FAST_FUNC;
++ void drop_capability(int cap_ordinal) FAST_FUNC;
++diff --git a/libbb/capability.c b/libbb/capability.c
++index e3c252a..397fc38 100644
++--- a/libbb/capability.c
+++++ b/libbb/capability.c
++@@ -5,6 +5,7 @@
++  */
++ //kbuild:lib-$(CONFIG_FEATURE_SETPRIV_CAPABILITIES) += capability.o
++ //kbuild:lib-$(CONFIG_RUN_INIT) += capability.o
+++//kbuild:lib-$(CONFIG_NSENTER) += capability.o
++ 
++ #include <linux/capability.h>
++ // #include <sys/capability.h>
++diff --git a/util-linux/nsenter.c b/util-linux/nsenter.c
++index 425d517..42eae19 100644
++--- a/util-linux/nsenter.c
+++++ b/util-linux/nsenter.c
++@@ -34,6 +34,7 @@
++ //usage:     "\n	-r[DIR]		Set root directory"
++ //usage:     "\n	-w[DIR]		Set working directory"
++ //usage:     "\n	-F		Don't fork before exec'ing PROG"
+++//usage:     "\n	-c		With -t, drop the capabilities PID does not hold"
++ 
++ #include <sched.h>
++ #ifndef CLONE_NEWUTS
++@@ -54,6 +55,22 @@
++ 
++ #include "libbb.h"
++ 
+++
+++#include <linux/capability.h>
+++#include <linux/securebits.h>
+++#include <sys/prctl.h>
+++
+++
+++DEFINE_STRUCT_CAPS;
+++
+++// #include <sys/capability.h>
+++// This header is in libcap, but the functions are in libc.
+++// Comment in the header says this above capset/capget:
+++/* system calls - look to libc for function to system call mapping */
+++extern int capset(cap_user_header_t header, cap_user_data_t data);
+++extern int capget(cap_user_header_t header, const cap_user_data_t data);
+++
+++
++ struct namespace_descr {
++ 	int flag;		/* value passed to setns() */
++ 	char ns_nsfile8[8];	/* "ns/" + namespace file in process' procfs entry */
++@@ -77,7 +94,8 @@ enum {
++ 	OPT_root	= 1 << 9,
++ 	OPT_wd		= 1 << 10,
++ 	OPT_nofork	= 1 << 11,
++-	OPT_prescred	= (1 << 12) * ENABLE_LONG_OPTS,
+++	OPT_cap 	= 1 << 12,
+++	OPT_prescred	= (1 << 13) * ENABLE_LONG_OPTS,
++ };
++ enum {
++ 	NS_USR_POS = 0,
++@@ -105,7 +123,7 @@ static const struct namespace_descr ns_list[] ALIGN_INT = {
++  * Upstream nsenter doesn't support the short option for --preserve-credentials
++  * "+": stop on first non-option
++  */
++-static const char opt_str[] ALIGN1 = "+""U::i::u::n::p::m::""t:+S:+G:+r::w::F";
+++static const char opt_str[] ALIGN1 = "+""U::i::u::n::p::m::""t:+S:+G:+r::w::Fc";
++ 
++ #if ENABLE_LONG_OPTS
++ static const char nsenter_longopts[] ALIGN1 =
++@@ -121,6 +139,7 @@ static const char nsenter_longopts[] ALIGN1 =
++ 	"root\0"			Optional_argument	"r"
++ 	"wd\0"				Optional_argument	"w"
++ 	"no-fork\0"			No_argument		"F"
+++	"caps\0"			No_argument		"c"
++ 	"preserve-credentials\0"	No_argument		"\xff"
++ 	;
++ #endif
++@@ -164,6 +183,7 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
++ 	int target_pid = 0;
++ 	int uid = 0;
++ 	int gid = 0;
+++	struct caps capst;
++ 
++ 	memset(ns_ctx_list, 0, sizeof(ns_ctx_list));
++ 
++@@ -196,6 +216,18 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
++ 					target_pid, ns->ns_nsfile8);
++ 	}
++ 
+++	/*
+++	 * Lets gather caps info from target pid before switching NS if --caps is used
+++	 */
+++	if ((opts & OPT_cap) && (opts & OPT_target)) {
+++		getcaps(&capst);
+++
+++		capst.header.pid = target_pid;
+++		if (capget(&capst.header, capst.data))
+++			bb_simple_perror_msg_and_die("capget");
+++	}
+++
+++
++ 	/*
++ 	 * Entering the user namespace without --preserve-credentials implies
++ 	 * --setuid & --setgid and clearing root's groups.
++@@ -262,6 +294,38 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
++ 		/* Child continues */
++ 	}
++ 
+++	/*
+++	 * Entering the namespace with caps matching the target
+++	 */
+++	if ((opts & OPT_cap) && (opts & OPT_target)) {
+++		__u32 bounds;
+++		int cap = 0;
+++		int ret;
+++
+++		/* Securebits are left as they are, not copied from PID */
+++		while ((ret = prctl(PR_CAPBSET_READ, cap)) >= 0) {
+++			// if we dont have a cap in bounding set, we don't
+++			// need to think about
+++			// dropinning it
+++			if (!ret)
+++				goto next;
+++
+++			// new bounds will be effective | permitted | inheritable of the target pid
+++			bounds = capst.data[CAP_TO_INDEX(cap)].effective
+++				| capst.data[CAP_TO_INDEX(cap)].permitted
+++				| capst.data[CAP_TO_INDEX(cap)].inheritable;
+++
+++			if ((bounds & CAP_TO_MASK(cap)) == CAP_TO_MASK(cap))
+++				goto next;
+++
+++			// printf("DROPPING bounding cap: %d\n", cap);
+++			if (prctl(PR_CAPBSET_DROP, cap))
+++				bb_simple_perror_msg_and_die("droppriv");
+++		next:
+++			cap++;
+++		}
+++	}
+++
++ 	if (opts & OPT_setgid) {
++ 		if (setgroups(0, NULL) < 0 && setgroups_failed)
++ 			bb_simple_perror_msg_and_die("setgroups");
+diff --git a/patches/busybox-1.38.0/0301-nsenter-add-C-cgroup-option-similar-to-util-linux.patch b/patches/busybox-1.38.0/0301-nsenter-add-C-cgroup-option-similar-to-util-linux.patch
+new file mode 100644
+index 000000000..e17e44a25
+--- /dev/null
++++ b/patches/busybox-1.38.0/0301-nsenter-add-C-cgroup-option-similar-to-util-linux.patch
+@@ -0,0 +1,110 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Thu, 13 Jan 2022 13:24:14 +0100
++Subject: [PATCH 301/305] nsenter: add -C/--cgroup option similar to util-linux
++
++(cherry picked from commit c5b27f41a127eae8eecbcefda3d2cdbf9ad4ef91)
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ util-linux/nsenter.c | 39 ++++++++++++++++++++++++---------------
++ 1 file changed, 24 insertions(+), 15 deletions(-)
++
++diff --git a/util-linux/nsenter.c b/util-linux/nsenter.c
++index 42eae19..2f8dc38 100644
++--- a/util-linux/nsenter.c
+++++ b/util-linux/nsenter.c
++@@ -26,6 +26,7 @@
++ //usage:     "\n	-n[FILE]	Enter network namespace"
++ //usage:     "\n	-p[FILE]	Enter pid namespace"
++ //usage:     "\n	-U[FILE]	Enter user namespace"
+++//usage:     "\n	-C[FILE]	Enter cgroup namespace"
++ //usage:     "\n	-S UID		Set uid in entered namespace"
++ //usage:     "\n	-G GID		Set gid in entered namespace"
++ //usage:	IF_LONG_OPTS(
++@@ -40,6 +41,9 @@
++ #ifndef CLONE_NEWUTS
++ # define CLONE_NEWUTS  0x04000000
++ #endif
+++#ifndef CLONE_NEWCGROUP
+++# define CLONE_NEWCGROUP 0x02000000
+++#endif
++ #ifndef CLONE_NEWIPC
++ # define CLONE_NEWIPC  0x08000000
++ #endif
++@@ -73,7 +77,7 @@ extern int capget(cap_user_header_t header, const cap_user_data_t data);
++ 
++ struct namespace_descr {
++ 	int flag;		/* value passed to setns() */
++-	char ns_nsfile8[8];	/* "ns/" + namespace file in process' procfs entry */
+++	char ns_nsfile8[10];	/* "ns/" + namespace file in process' procfs entry */
++ };
++ 
++ struct namespace_ctx {
++@@ -83,22 +87,24 @@ struct namespace_ctx {
++ 
++ enum {
++ 	OPT_user	= 1 << 0,
++-	OPT_ipc		= 1 << 1,
++-	OPT_uts		= 1 << 2,
++-	OPT_network	= 1 << 3,
++-	OPT_pid		= 1 << 4,
++-	OPT_mount	= 1 << 5,
++-	OPT_target	= 1 << 6,
++-	OPT_setuid	= 1 << 7,
++-	OPT_setgid	= 1 << 8,
++-	OPT_root	= 1 << 9,
++-	OPT_wd		= 1 << 10,
++-	OPT_nofork	= 1 << 11,
++-	OPT_cap 	= 1 << 12,
++-	OPT_prescred	= (1 << 13) * ENABLE_LONG_OPTS,
+++	OPT_cgroup	= 1 << 1,
+++	OPT_ipc		= 1 << 2,
+++	OPT_uts		= 1 << 3,
+++	OPT_network	= 1 << 4,
+++	OPT_pid		= 1 << 5,
+++	OPT_mount	= 1 << 6,
+++	OPT_target	= 1 << 7,
+++	OPT_setuid	= 1 << 8,
+++	OPT_setgid	= 1 << 9,
+++	OPT_root	= 1 << 10,
+++	OPT_wd		= 1 << 11,
+++	OPT_nofork	= 1 << 12,
+++	OPT_cap 	= 1 << 13,
+++	OPT_prescred	= (1 << 14) * ENABLE_LONG_OPTS,
++ };
++ enum {
++ 	NS_USR_POS = 0,
+++	NS_CGROUP_POS,
++ 	NS_IPC_POS,
++ 	NS_UTS_POS,
++ 	NS_NET_POS,
++@@ -113,6 +119,7 @@ enum {
++  */
++ static const struct namespace_descr ns_list[] ALIGN_INT = {
++ 	{ CLONE_NEWUSER, "ns/user", },
+++	{ CLONE_NEWCGROUP,   "ns/cgroup",  },
++ 	{ CLONE_NEWIPC,  "ns/ipc",  },
++ 	{ CLONE_NEWUTS,  "ns/uts",  },
++ 	{ CLONE_NEWNET,  "ns/net",  },
++@@ -123,11 +130,12 @@ static const struct namespace_descr ns_list[] ALIGN_INT = {
++  * Upstream nsenter doesn't support the short option for --preserve-credentials
++  * "+": stop on first non-option
++  */
++-static const char opt_str[] ALIGN1 = "+""U::i::u::n::p::m::""t:+S:+G:+r::w::Fc";
+++static const char opt_str[] ALIGN1 = "+""U::C::i::u::n::p::m::""t:+S:+G:+r::w::Fc";
++ 
++ #if ENABLE_LONG_OPTS
++ static const char nsenter_longopts[] ALIGN1 =
++ 	"user\0"			Optional_argument	"U"
+++	"cgroup\0"			Optional_argument	"C"
++ 	"ipc\0"				Optional_argument	"i"
++ 	"uts\0"				Optional_argument	"u"
++ 	"net\0"				Optional_argument	"n"
++@@ -189,6 +197,7 @@ int nsenter_main(int argc UNUSED_PARAM, char **argv)
++ 
++ 	opts = getopt32long(argv, opt_str, nsenter_longopts,
++ 			&ns_ctx_list[NS_USR_POS].path,
+++			&ns_ctx_list[NS_CGROUP_POS].path,
++ 			&ns_ctx_list[NS_IPC_POS].path,
++ 			&ns_ctx_list[NS_UTS_POS].path,
++ 			&ns_ctx_list[NS_NET_POS].path,
+diff --git a/patches/busybox-1.38.0/0302-mdev-support-FOLLOW_X_ROOT-and-MDEV_CONF.patch b/patches/busybox-1.38.0/0302-mdev-support-FOLLOW_X_ROOT-and-MDEV_CONF.patch
+new file mode 100644
+index 000000000..496852adc
+--- /dev/null
++++ b/patches/busybox-1.38.0/0302-mdev-support-FOLLOW_X_ROOT-and-MDEV_CONF.patch
+@@ -0,0 +1,163 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Mon, 23 May 2022 23:49:29 +0200
++Subject: [PATCH 302/305] mdev: support FOLLOW_X_ROOT and MDEV_CONF
++
++Let an mdev daemon work on the /dev of a root that is being prepared in
++a mount namespace and keep working after its pivot or switch root:
++FOLLOW_X_ROOT names that root and MDEV_CONF overrides /etc/mdev.conf.
++The config file is now opened once at startup, since the daemon may
++chroot away from it later.
++
++[fernando: squashed "add support for ROOTFSDIR and MDEV_CONF envs", "add
++ support for FOLLOW_X_ROOT env; superseed ROOTFSDIR in turn", "fix
++ depends in mdev.c for FOLLOW_X_ROOT config" and "add FOLLOW_X_PID
++ support for pantavisor mdev". ROOTFSDIR did not survive the series, and
++ FOLLOW_X_PID is left out: nothing uses it and it passed the string to
++ a %d, so it could not find the process. Check chdir() and chroot()
++ when following the root, keep make_device() unchanged without
++ FOLLOW_X_ROOT, and drop an unused getcwd() buffer.]
++(cherry picked from commit 2e99cb323f017bd88128cc0e21b07a9c720cae31)
++(cherry picked from commit f12cd7033f7f563e342a038f5e451be5976ced42)
++(cherry picked from commit fb3b7e1353d126be78cd6f4c329a3018db5161d0)
++(cherry picked from commit 838b5e51f408d1c68ce52734de6b5f09e5e3da13)
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ util-linux/mdev.c | 71 +++++++++++++++++++++++++++++++++++++++--------
++ 1 file changed, 60 insertions(+), 11 deletions(-)
++
++diff --git a/util-linux/mdev.c b/util-linux/mdev.c
++index e98d467..f8892e9 100644
++--- a/util-linux/mdev.c
+++++ b/util-linux/mdev.c
++@@ -74,6 +74,17 @@
++ //config:	hotplug events this mode of operation will consume less
++ //config:	resources than registering mdev as hotplug helper or using the
++ //config:	uevent applet.
+++//config:
+++//config:config FEATURE_MDEV_FOLLOW_X_ROOT
+++//config:	bool "Support following a switch or pivot root in mount_namespace"
+++//config:	default y
+++//config:	depends on FEATURE_MDEV_DAEMON
+++//config:	help
+++//config:	Add support for following a switch_root and pivot_root of pid 1
+++//config:	Useful for having mdev prefer the dev/ nodes of a root getting
+++//config:	prepared in a mount namespace before the pivot/switch_root and then
+++//config:	continue operating in DAEMON mode inside mnt namespace afterwards.
+++//config:
++ 
++ //applet:IF_MDEV(APPLET(mdev, BB_DIR_SBIN, BB_SUID_DROP))
++ 
++@@ -116,6 +127,7 @@
++ #include "xregex.h"
++ #include <linux/netlink.h>
++ #include <syslog.h>
+++#include <unistd.h>
++ 
++ /* "mdev -s" scans /sys/class/xxx, looking for directories which have dev
++  * file (it is of the form "M:m\n"). Example: /sys/class/tty/tty0/dev
++@@ -322,6 +334,11 @@ struct globals {
++ /* We use additional bytes in make_device() */
++ #define SCRATCH_SIZE 128
++ 
+++#if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
+++static char *newroot = NULL;
+++static char *newrootdev = NULL;
+++#endif
+++
++ #if ENABLE_FEATURE_MDEV_CONF
++ 
++ static void make_default_cur_rule(void)
++@@ -470,13 +487,6 @@ static const struct rule *next_rule(void)
++ {
++ 	struct rule *rule;
++ 
++-	/* Open conf file if we didn't do it yet */
++-	if (!G.parser && G.filename) {
++-		dbg3("config_open('%s')", G.filename);
++-		G.parser = config_open2(G.filename, fopen_for_read);
++-		G.filename = NULL;
++-	}
++-
++ 	if (G.rule_vec) {
++ 		/* mdev -s */
++ 		/* Do we have rule parsed already? */
++@@ -575,6 +585,19 @@ static void make_device(char *device_name, char *path, int operation)
++ {
++ 	int major, minor, type, len;
++ 	char *path_end = path + strlen(path);
+++#if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
+++	struct stat st;
+++
+++	if (newrootdev && !(!access(newrootdev, X_OK) && !stat(newrootdev, &st) && S_ISDIR(st.st_mode))) {
+++		dbg1("following x root...");
+++		newrootdev = NULL;
+++		xchdir("/");
+++		xchdir("..");
+++		xchroot(".");
+++	}
+++
+++	xchdir(newrootdev ? newrootdev : "/dev");
+++#endif
++ 
++ 	/* Try to read major/minor string.  Note that the kernel puts \n after
++ 	 * the data, so we don't need to worry about null terminating the string
++@@ -953,7 +976,13 @@ static void load_firmware(const char *firmware, const char *sysfs_path)
++ 		full_write(loading_fd, "-1", 2);
++ 
++  out:
++-	xchdir("/dev");
+++#if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
+++	if (newrootdev)
+++		xchdir(newrootdev);
+++	else
+++#endif
+++		xchdir("/dev");
+++
++ 	if (ENABLE_FEATURE_CLEAN_UP) {
++ 		close(firmware_fd);
++ 		close(loading_fd);
++@@ -1256,20 +1285,40 @@ int mdev_main(int argc UNUSED_PARAM, char **argv)
++ 	/* Force the configuration file settings exactly */
++ 	umask(0);
++ 
++-	xchdir("/dev");
++-
++ 	opt = getopt32(argv, "^"
++ 		"sS" IF_FEATURE_MDEV_DAEMON("df") "v"
++ 		"\0"
++ 		"vv",
++ 		&G.verbose);
++ 
+++#if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
+++	newroot = getenv("FOLLOW_X_ROOT");
+++
+++	if (newroot && !newrootdev) {
+++		newrootdev = malloc(sizeof(char) * (strlen(newroot) + 6));
+++		sprintf(newrootdev, "%s%s", newroot, "/dev");
+++	}
+++
+++	if (newrootdev)
+++		xchdir(newrootdev);
+++	else
+++#endif
+++		xchdir("/dev");
+++
+++
++ #if ENABLE_FEATURE_MDEV_CONF
++-	G.filename = "/etc/mdev.conf";
+++	G.filename = getenv("MDEV_CONF") ? getenv("MDEV_CONF") : "/etc/mdev.conf";
++ 	if (opt & (MDEV_OPT_SCAN|MDEV_OPT_DAEMON)) {
++ 		/* Same as xrealloc_vector(NULL, 4, 0): */
++ 		G.rule_vec = xzalloc((1 << 4) * sizeof(*G.rule_vec));
++ 	}
+++
+++	/* Open conf file if we didn't do it yet */
+++	if (!G.parser && G.filename) {
+++		dbg3("config_open('%s')", G.filename);
+++		G.parser = config_open2(G.filename, fopen_for_read);
+++		G.filename = NULL;
+++	}
++ #endif
++ 
++ 	if (opt & MDEV_OPT_SYSLOG) {
+diff --git a/patches/busybox-1.38.0/0303-fix-create_and_bind_to_netlink-setting-sa.nl_pid-to-.patch b/patches/busybox-1.38.0/0303-fix-create_and_bind_to_netlink-setting-sa.nl_pid-to-.patch
+new file mode 100644
+index 000000000..0f5020db6
+--- /dev/null
++++ b/patches/busybox-1.38.0/0303-fix-create_and_bind_to_netlink-setting-sa.nl_pid-to-.patch
+@@ -0,0 +1,25 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Tue, 7 Feb 2023 09:08:11 +0100
++Subject: [PATCH 303/305] fix create_and_bind_to_netlink setting sa.nl_pid to
++ potentially not system unique value
++
++(cherry picked from commit 5b34ff9e9804b11f851c2c0e6782e015de6e790f)
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ libbb/xconnect.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/libbb/xconnect.c b/libbb/xconnect.c
++index 095f7ff..e99c59b 100644
++--- a/libbb/xconnect.c
+++++ b/libbb/xconnect.c
++@@ -414,7 +414,7 @@ int FAST_FUNC create_and_bind_to_netlink(int proto, int grp, unsigned rcvbuf)
++ 
++ 	memset(&sa, 0, sizeof(sa));
++ 	sa.nl_family = AF_NETLINK;
++-	sa.nl_pid = getpid();
+++	sa.nl_pid = 0;
++ 	sa.nl_groups = grp;
++ 	xbind(fd, (struct sockaddr *) &sa, sizeof(sa));
++ 	close_on_exec_on(fd);
+diff --git a/patches/busybox-1.38.0/0304-Improve-mdev-MODALIAS-support-loading-pci-bus-driver.patch b/patches/busybox-1.38.0/0304-Improve-mdev-MODALIAS-support-loading-pci-bus-driver.patch
+new file mode 100644
+index 000000000..e4753f80e
+--- /dev/null
++++ b/patches/busybox-1.38.0/0304-Improve-mdev-MODALIAS-support-loading-pci-bus-driver.patch
+@@ -0,0 +1,253 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Wed, 22 Feb 2023 16:47:04 +0100
++Subject: [PATCH 304/305] Improve mdev MODALIAS; support loading pci bus
++ drivers during -s (scan)
++
++ * make scan do recursive_action on /sys/bus/pci/devices that have /modalias
++ * ensure MODALIAS env is set from /uevent
++ * give uevent file more space so the device ids dont get chopped off
++ * introduce ACTION_FOLLOWLINKS_L1 flag for resurvice_action to allow
++   to follow links only for level 0 and 1
++ * introduce OP_modalias to make_device function
++
++[fernando: drop unused variables and an always-false size_t < 0 check
++ from fileActionModalias()]
++(cherry picked from commit 758b22439ecddb345253198433778972f86b9a25)
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ include/libbb.h          |  7 ++--
++ libbb/recursive_action.c |  4 +-
++ util-linux/mdev.c        | 83 +++++++++++++++++++++++++++++++++++-----
++ 3 files changed, 80 insertions(+), 14 deletions(-)
++
++diff --git a/include/libbb.h b/include/libbb.h
++index 82aa043..82e52f3 100644
++--- a/include/libbb.h
+++++ b/include/libbb.h
++@@ -532,9 +532,10 @@ enum {
++ 	ACTION_RECURSE        = (1 << 0),
++ 	ACTION_FOLLOWLINKS    = (1 << 1),
++ 	ACTION_FOLLOWLINKS_L0 = (1 << 2),
++-	ACTION_DEPTHFIRST     = (1 << 3),
++-	ACTION_QUIET          = (1 << 4),
++-	ACTION_DANGLING_OK    = (1 << 5),
+++	ACTION_FOLLOWLINKS_L1 = (1 << 3),
+++	ACTION_DEPTHFIRST     = (1 << 4),
+++	ACTION_QUIET          = (1 << 5),
+++	ACTION_DANGLING_OK    = (1 << 6),
++ };
++ typedef uint8_t recurse_flags_t;
++ typedef struct recursive_state {
++diff --git a/libbb/recursive_action.c b/libbb/recursive_action.c
++index b1c4bfa..13fbf3e 100644
++--- a/libbb/recursive_action.c
+++++ b/libbb/recursive_action.c
++@@ -74,7 +74,9 @@ static int recursive_action1(recursive_state_t *state, const char *fileName)
++ 
++ 	follow = ACTION_FOLLOWLINKS;
++ 	if (state->depth == 0)
++-		follow = ACTION_FOLLOWLINKS | ACTION_FOLLOWLINKS_L0;
+++		follow |= ACTION_FOLLOWLINKS_L0 | ACTION_FOLLOWLINKS_L1;
+++	if (state->depth == 1)
+++		follow |= ACTION_FOLLOWLINKS_L1;
++ 	follow &= state->flags;
++ 	status = (follow ? stat : lstat)(fileName, &statbuf);
++ 	if (status < 0) {
++diff --git a/util-linux/mdev.c b/util-linux/mdev.c
++index f8892e9..4178bcc 100644
++--- a/util-linux/mdev.c
+++++ b/util-linux/mdev.c
++@@ -285,7 +285,7 @@
++ #endif
++ 
++ static const char keywords[] ALIGN1 = "add\0remove\0"; // "change\0"
++-enum { OP_add, OP_remove };
+++enum { OP_add, OP_remove, OP_modalias };
++ 
++ struct envmatch {
++ 	struct envmatch *next;
++@@ -311,6 +311,7 @@ struct globals {
++ 	int verbose;
++ 	char *subsystem;
++ 	char *subsys_env; /* for putenv("SUBSYSTEM=subsystem") */
+++	char *modalias_env; /* for putenv("MODALIAS=alias:somethinglonger") */
++ #if ENABLE_FEATURE_MDEV_CONF
++ 	const char *filename;
++ 	parser_t *parser;
++@@ -331,8 +332,11 @@ struct globals {
++ /* Prevent infinite loops in /sys symlinks */
++ #define MAX_SYSFS_DEPTH 3
++ 
+++/* Prevent infinite loops in /sys symlinks */
+++#define MAX_SYSFS_DEPTH_MODALIAS 10
+++
++ /* We use additional bytes in make_device() */
++-#define SCRATCH_SIZE 128
+++#define SCRATCH_SIZE 512
++ 
++ #if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
++ static char *newroot = NULL;
++@@ -584,7 +588,8 @@ static char *build_alias(char *alias, const char *device_name)
++ static void make_device(char *device_name, char *path, int operation)
++ {
++ 	int major, minor, type, len;
++-	char *path_end = path + strlen(path);
+++	int path_len = strlen(path);
+++	char *path_end = path + path_len;
++ #if ENABLE_FEATURE_MDEV_FOLLOW_X_ROOT
++ 	struct stat st;
++ 
++@@ -607,7 +612,8 @@ static void make_device(char *device_name, char *path, int operation)
++ 	major = -1;
++ 	if (operation == OP_add) {
++ 		strcpy(path_end, "/dev");
++-		len = open_read_close(path, path_end + 1, SCRATCH_SIZE - 1);
+++		len = open_read_close(path, path_end + 1, PATH_MAX +
+++				      SCRATCH_SIZE - path_len - 1);
++ 		*path_end = '\0';
++ 		if (len < 1) {
++ 			if (!ENABLE_FEATURE_MDEV_EXEC)
++@@ -624,6 +630,8 @@ static void make_device(char *device_name, char *path, int operation)
++ 
++ 	/* Determine device name */
++ 	if (!device_name) {
+++		char *tok = NULL;
+++		char *strd = NULL;
++ 		/*
++ 		 * There was no $DEVNAME envvar (for example, mdev -s never has).
++ 		 * But it is very useful: it contains the *path*, not only basename,
++@@ -634,20 +642,38 @@ static void make_device(char *device_name, char *path, int operation)
++ 		 * DEVNAME=snd/controlC0
++ 		 */
++ 		strcpy(path_end, "/uevent");
++-		len = open_read_close(path, path_end + 1, SCRATCH_SIZE - 1);
+++		len = open_read_close(path, path_end + 1, PATH_MAX + SCRATCH_SIZE - path_len - 1);
++ 		if (len < 0)
++ 			len = 0;
++ 		*path_end = '\0';
++ 		path_end[1 + len] = '\0';
+++		strd = xstrdup(path_end + 1);
+++		unsetenv("MODALIAS");
+++		if (G.modalias_env)
+++			free(G.modalias_env);
+++		G.modalias_env = NULL;
+++		tok = strtok(strd, "\n");
+++		while(tok) {
+++			if (!strncmp(tok, "MODALIAS=", 9)) {
+++				G.modalias_env = strdup(tok);
+++				dbg3("MODALIAS: %s", G.modalias_env);
+++				putenv(G.modalias_env);
+++			}
+++			tok = strtok(NULL, "\n");
+++		}
+++		if (strd)
+++			free(strd);
+++
++ 		device_name = strstr(path_end + 1, "\nDEVNAME=");
++ 		if (device_name) {
++ 			device_name += sizeof("\nDEVNAME=")-1;
++ 			strchrnul(device_name, '\n')[0] = '\0';
++-		} else {
++-			/* Fall back to just basename */
+++		} else if (operation != OP_modalias) {
+++			/* Fall back to just basename unless modalias */
++ 			device_name = (char*) bb_basename(path);
++ 		}
++ 	}
+++
++ 	/* Determine device type */
++ 	/*
++ 	 * http://kernel.org/doc/pending/hotplug.txt says that only
++@@ -686,6 +712,7 @@ static void make_device(char *device_name, char *path, int operation)
++ 			memset(off, 0, sizeof(off));
++ 			goto rule_matches;
++ 		}
+++
++ 		if (rule->envvar) { /* $envvar=regex rule */
++ 			str_to_match = getenv(rule->envvar);
++ 			dbg3("getenv('%s'):'%s'", rule->envvar, str_to_match);
++@@ -719,7 +746,7 @@ static void make_device(char *device_name, char *path, int operation)
++ #endif
++ 		/* Build alias name */
++ 		alias = NULL;
++-		if (ENABLE_FEATURE_MDEV_RENAME && rule->ren_mov) {
+++		if (ENABLE_FEATURE_MDEV_RENAME && operation != OP_modalias && rule->ren_mov) {
++ 			aliaslink = rule->ren_mov[0];
++ 			if (aliaslink == '!') {
++ 				/* "!": suppress node creation/deletion */
++@@ -780,7 +807,7 @@ static void make_device(char *device_name, char *path, int operation)
++ 
++ 		/* "Execute" the line we found */
++ 		node_name = device_name;
++-		if (ENABLE_FEATURE_MDEV_RENAME && alias) {
+++		if (ENABLE_FEATURE_MDEV_RENAME && operation != OP_modalias && alias) {
++ 			node_name = alias = build_alias(alias, device_name);
++ 			dbg3("alias2:'%s'", alias);
++ 		}
++@@ -843,7 +870,7 @@ static void make_device(char *device_name, char *path, int operation)
++ 			unlink(node_name);
++ 		}
++ 
++-		if (ENABLE_FEATURE_MDEV_RENAME)
+++		if (ENABLE_FEATURE_MDEV_RENAME && operation != OP_modalias)
++ 			free(alias);
++ 
++ 		/* We found matching line.
++@@ -908,6 +935,28 @@ static int FAST_FUNC fileAction(struct recursive_state *state,
++ 	return TRUE;
++ }
++ 
+++/* File callback for /sys/ traversal.
+++ * We act only on "/sys/.../dev" (pseudo)file
+++ */
+++static int FAST_FUNC fileActionModalias(struct recursive_state *state,
+++		const char *fileName,
+++		struct stat *statbuf UNUSED_PARAM)
+++{
+++	size_t len = strlen(fileName) - 9; /* can't underflow */
+++	char *path = state->userData;	/* char array[PATH_MAX + SCRATCH_SIZE] */
+++
+++	/* Is it a ".../dev" file? (len check is for paranoid reasons) */
+++	if (strcmp(fileName + len, "/modalias") != 0 || len >= PATH_MAX - 32)
+++		return FALSE; /* not .../dev */
+++
+++	strcpy(path, fileName);
+++	path[len] = '\0';
+++
+++	make_device(/*DEVNAME:*/ NULL, path, OP_modalias);
+++
+++	return TRUE;
+++}
+++
++ /* Directory callback for /sys/ traversal */
++ static int FAST_FUNC dirAction(struct recursive_state *state,
++ 		const char *fileName UNUSED_PARAM,
++@@ -916,6 +965,14 @@ static int FAST_FUNC dirAction(struct recursive_state *state,
++ 	return (state->depth >= MAX_SYSFS_DEPTH ? SKIP : TRUE);
++ }
++ 
+++/* Directory callback for /sys/ traversal */
+++static int FAST_FUNC dirActionModalias(struct recursive_state *state,
+++		const char *fileName UNUSED_PARAM,
+++		struct stat *statbuf UNUSED_PARAM)
+++{
+++	return (state->depth >= MAX_SYSFS_DEPTH_MODALIAS ? SKIP : TRUE);
+++}
+++
++ /* For the full gory details, see linux/Documentation/firmware_class/README
++  *
++  * Firmware loading works like this:
++@@ -1172,6 +1229,12 @@ static void initial_scan(char *temp)
++ 
++ 	putenv((char*)"ACTION=add");
++ 
+++
+++	/* Create all devices from /sys/dev hierarchy */
+++	recursive_action("/sys/bus/pci/devices",
+++			 ACTION_RECURSE | ACTION_FOLLOWLINKS_L1,
+++			 fileActionModalias, dirActionModalias, temp);
+++
++ 	/* Create all devices from /sys/dev hierarchy */
++ 	recursive_action("/sys/dev",
++ 			 ACTION_RECURSE | ACTION_FOLLOWLINKS,
+diff --git a/patches/busybox-1.38.0/0305-mdev-don-t-match-name-rules-for-modalias-only-device.patch b/patches/busybox-1.38.0/0305-mdev-don-t-match-name-rules-for-modalias-only-device.patch
+new file mode 100644
+index 000000000..85519ec11
+--- /dev/null
++++ b/patches/busybox-1.38.0/0305-mdev-don-t-match-name-rules-for-modalias-only-device.patch
+@@ -0,0 +1,53 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++Date: Mon, 16 Nov 2026 16:45:26 -0300
++Subject: [PATCH 305/305] mdev: don't match name rules for modalias-only
++ devices
++
++The MODALIAS scan of "mdev -s" calls make_device() with OP_modalias for
++every PCI device, and a device without DEVNAME in its uevent keeps a
++NULL device name. A rule that matches on the device name then passes
++NULL to regexec(), and mdev segfaults as soon as mdev.conf has such a
++rule, as the default one does:
++
++  Segmentation fault      mdev -s
++
++Skip name rules when there is no name. $envvar rules, such as
++$MODALIAS=..., and the final match-all rule still apply, so the scan
++still loads drivers. For the same reason, set MDEV to an empty string
++instead of passing NULL to printf.
++
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ util-linux/mdev.c | 11 +++++++++--
++ 1 file changed, 9 insertions(+), 2 deletions(-)
++
++diff --git a/util-linux/mdev.c b/util-linux/mdev.c
++index 4178bcc..ae2168b 100644
++--- a/util-linux/mdev.c
+++++ b/util-linux/mdev.c
++@@ -722,7 +722,14 @@ static void make_device(char *device_name, char *path, int operation)
++ 		/* else: str_to_match = device_name */
++ 
++ 		if (rule->regex_compiled) {
++-			int regex_match = regexec(&rule->match, str_to_match, ARRAY_SIZE(off), off, 0);
+++			int regex_match;
+++
+++			/* OP_modalias for a device without DEVNAME has no
+++			 * name to match: skip name rules, but not $envvar
+++			 * rules or the final match-all rule */
+++			if (!str_to_match)
+++				continue;
+++			regex_match = regexec(&rule->match, str_to_match, ARRAY_SIZE(off), off, 0);
++ 			dbg3("regex_match for '%s':%d", str_to_match, regex_match);
++ 			//bb_error_msg("matches:");
++ 			//for (int i = 0; i < ARRAY_SIZE(off); i++) {
++@@ -851,7 +858,7 @@ static void make_device(char *device_name, char *path, int operation)
++ 
++ 		if (ENABLE_FEATURE_MDEV_EXEC && command) {
++ 			/* setenv will leak memory, use putenv/unsetenv/free */
++-			char *s = xasprintf("%s=%s", "MDEV", node_name);
+++			char *s = xasprintf("%s=%s", "MDEV", node_name ? node_name : "");
++ 			putenv(s);
++ 			dbg1("running: %s", command);
++ 			if (system(command) == -1)
+diff --git a/patches/busybox-1.38.0/series.pantavisor b/patches/busybox-1.38.0/series.pantavisor
+new file mode 100644
+index 000000000..b2f6f8d96
+--- /dev/null
++++ b/patches/busybox-1.38.0/series.pantavisor
+@@ -0,0 +1,18 @@
++# PTXdist's series plus the Pantavisor patches; BUSYBOX_SERIES selects it
++# when PANTAVISOR is enabled.
++#tag:base --start-number 1
++#tag:upstream-stable --start-number 1
++#tag:upstream-master --start-number 100
++#tag:ptx --start-number 200
++0200-reactivate-check-for-tty.patch
++0201-build-system-only-pass-real-libs-to-SELINUX_LIBS.patch
++0202-scripts-trylink-honour-SKIP_STRIP-and-don-t-strip-if.patch
++0203-tc-Fix-compilation-with-Linux-v6.8-rc1.patch
++#tag:pantavisor --start-number 300
++# From github.com/pantavisor/busybox-pv (pv/1_35_stable), rebased onto 1.38.0 and squashed
++0300-nsenter-add-caps-to-adopt-the-target-s-capabilities.patch
++0301-nsenter-add-C-cgroup-option-similar-to-util-linux.patch
++0302-mdev-support-FOLLOW_X_ROOT-and-MDEV_CONF.patch
++0303-fix-create_and_bind_to_netlink-setting-sa.nl_pid-to-.patch
++0304-Improve-mdev-MODALIAS-support-loading-pci-bus-driver.patch
++0305-mdev-don-t-match-name-rules-for-modalias-only-device.patch
+diff --git a/rules/busybox.in b/rules/busybox.in
+index 612e21ade..0a9f1a3aa 100644
+--- a/rules/busybox.in
++++ b/rules/busybox.in
+@@ -106,6 +106,25 @@ config BUSYBOX_CROND_SYSTEMD_UNIT
+ 	depends on BUSYBOX_CROND && SYSTEMD
+ 	prompt "crond systemd service files"
+ 
++# The Pantavisor patches are in series.pantavisor; every other build
++# applies the stock series.
++config BUSYBOX_SERIES
++	string
++	default "series.pantavisor" if PANTAVISOR
++	default "series"
++
++# Added by 0302 in series.pantavisor. Kept here, not in config/busybox,
++# which mirrors stock busybox's Kconfig.
++config BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT
++	bool
++	default y
++	depends on PANTAVISOR && BUSYBOX_FEATURE_MDEV_DAEMON
++	prompt "mdev: follow switch/pivot root (FOLLOW_X_ROOT)"
++	help
++	  Needed by Pantavisor's container mdev hook, which runs an mdev
++	  daemon in the container's mount namespace and keeps it working
++	  after the container's pivot root.
++
+ comment "---"
+ 
+ source "config/busybox/Config.in"
+-- 
+2.43.0
+

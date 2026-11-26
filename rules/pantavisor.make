@@ -14,11 +14,11 @@ PACKAGES-$(PTXCONF_PANTAVISOR) += pantavisor
 #
 # Paths and names
 #
-PANTAVISOR_VERSION	:= 030
-PANTAVISOR_SHA256	:= f67ae2ada21bd3afd69d4d50a5eb66cf35ff9b0997b3c04e3b2bee5768cd7caa
+PANTAVISOR_VERSION	:= 031
+PANTAVISOR_SHA256	:= ec0785e36ca53931bc6dd0c8316ffbe43017ec0e4c85e53d5a437f87b97c53a6
 PANTAVISOR		:= pantavisor-$(PANTAVISOR_VERSION)
 PANTAVISOR_SUFFIX	:= tar.gz
-PANTAVISOR_URL		:= https://github.com/pantavisor/pantavisor.git;tag=$(PANTAVISOR_VERSION)
+PANTAVISOR_URL		:= git+https://github.com/pantavisor/pantavisor.git;tag=$(PANTAVISOR_VERSION)
 PANTAVISOR_SOURCE	:= $(SRCDIR)/$(PANTAVISOR).$(PANTAVISOR_SUFFIX)
 PANTAVISOR_DIR		:= $(BUILDDIR)/$(PANTAVISOR)
 PANTAVISOR_LICENSE	:= MIT
@@ -29,27 +29,44 @@ PANTAVISOR_LICENSE_FILES := \
 # Prepare
 # ----------------------------------------------------------------------------
 
+# The private prefixes of libevent22 and mbedtls36 (LIBEVENT22_PREFIX,
+# MBEDTLS36_PREFIX), spelled out because rule files are not included in a
+# fixed order. CMAKE_PREFIX_PATH makes find_library() take their static
+# libs before a libevent 2.1 or mbedtls 4 in /usr/lib. The include paths go
+# into CPPFLAGS: CMakeLists.txt passes PANTAVISOR_RUNTIME_MBEDTLS_INCLUDE_DIR,
+# not the _DIRS it finds.
+PANTAVISOR_LIBEVENT_PREFIX := /usr/lib/libevent-2.2
+PANTAVISOR_MBEDTLS_PREFIX := /usr/lib/mbedtls-3.6
+PANTAVISOR_CPPFLAGS	:= \
+	-I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_LIBEVENT_PREFIX)/include \
+	-I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_MBEDTLS_PREFIX)/include
+
 PANTAVISOR_CONF_TOOL	:= cmake
 PANTAVISOR_CONF_OPT	:= \
 	$(CROSS_CMAKE_USR) \
-	-DPANTAVISOR_RUNTIME=ON \
+	-DCMAKE_PREFIX_PATH="$(PANTAVISOR_LIBEVENT_PREFIX);$(PANTAVISOR_MBEDTLS_PREFIX)" \
 	-DPANTAVISOR_APPENGINE=OFF \
-	-DPANTAVISOR_PVTEST=OFF \
-	-DPANTAVISOR_PVTX_STATIC=OFF \
 	-DPANTAVISOR_CLANG_FORMAT_CHECK=OFF \
 	-DPANTAVISOR_DCP_BLOB_CREATE=OFF \
 	-DPANTAVISOR_DEBUG=$(call ptx/onoff, PTXCONF_PANTAVISOR_DEBUG) \
 	-DPANTAVISOR_DEBUG_HOOKS=$(call ptx/onoff, PTXCONF_PANTAVISOR_DEBUG_HOOKS) \
+	-DPANTAVISOR_DEFAULTS_SKIP_INSTALL=OFF \
+	-DPANTAVISOR_DISTRO_NAME=ptxdist \
+	-DPANTAVISOR_DISTRO_VERSION=$(PTXDIST_VERSION_FULL) \
 	-DPANTAVISOR_DM_CRYPT=$(call ptx/onoff, PTXCONF_PANTAVISOR_DM_CRYPT) \
 	-DPANTAVISOR_DM_VERITY=$(call ptx/onoff, PTXCONF_PANTAVISOR_DM_VERITY) \
 	-DPANTAVISOR_E2FSGROW_ENABLE=$(call ptx/onoff, PTXCONF_PANTAVISOR_E2FSGROW) \
 	-DPANTAVISOR_PVCONTROL=$(call ptx/onoff, PTXCONF_PANTAVISOR_PVCONTROL) \
+	-DPANTAVISOR_PVS_SKIP_INSTALL=$(call ptx/ifdef, PTXCONF_PANTAVISOR_DEVELOPER_TRUST,OFF,ON) \
+	-DPANTAVISOR_PVTEST=OFF \
 	-DPANTAVISOR_PVTX=$(call ptx/onoff, PTXCONF_PANTAVISOR_PVTX) \
+	-DPANTAVISOR_PVTX_STATIC=OFF \
+	-DPANTAVISOR_PVZRAM_TEST=OFF \
+	-DPANTAVISOR_RUNTIME=ON \
 	-DPANTAVISOR_XCONNECT=$(call ptx/onoff, PTXCONF_PANTAVISOR_XCONNECT) \
-	-DPANTAVISOR_DISTRO_NAME=ptxdist \
-	-DPANTAVISOR_DISTRO_VERSION=$(PTXDIST_VERSION_FULL)
+	-DPANTAVISOR_XCONNECT_DBUS_SYSTEMBUS=OFF
 
-# Consumed by gen_version.sh (see patches/pantavisor-030).
+# Consumed by gen_version.sh (see patches/pantavisor-031).
 PANTAVISOR_MAKE_ENV	:= \
 	PV_GIT_DESCRIBE=$(PANTAVISOR_VERSION)
 
@@ -61,6 +78,35 @@ PANTAVISOR_CFLAGS	:= \
 	-std=gnu17 \
 	-Wno-unused-result \
 	-Wno-error=implicit-function-declaration
+
+# ----------------------------------------------------------------------------
+# Install
+# ----------------------------------------------------------------------------
+
+# Since 031, the shipped config turns the secure boot handlers on, and with
+# them dm-verity checks of dm: volumes. Follow PANTAVISOR_DM_VERITY instead,
+# like meta-pantavisor does.
+# The shipped config sets no cgroup version, which means v1 in embedded
+# mode. Set it per LXC runtime, as meta-pantavisor's pvbase.bbclass does:
+# LXC 3 only has cgroup v1.
+#
+# Pantavisor keeps its containers in $PV_SYSTEM_USRDIR/var/lib/lxc
+# (/usr/var/lib/lxc), and fallbear-cmd runs lxc-info and lxc-console without
+# -P. lxc.conf makes that liblxc's default lxcpath; stock lxc's is
+# /var/lib/lxc.
+PANTAVISOR_CGROUP_VERSION := $(call ptx/ifdef, PTXCONF_PANTAVISOR_LXC_DEPRECATED,1,auto)
+
+$(STATEDIR)/pantavisor.install:
+	@$(call targetinfo)
+	@$(call world/install, PANTAVISOR)
+	@sed -i 's/^PV_SECUREBOOT_HANDLERS=.*/PV_SECUREBOOT_HANDLERS=$(call ptx/ifdef, PTXCONF_PANTAVISOR_DM_VERITY,1,0)/' \
+		$(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@sed -i '/^PV_SYSTEM_CGROUP_VERSION=/d' $(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@echo 'PV_SYSTEM_CGROUP_VERSION=$(PANTAVISOR_CGROUP_VERSION)' >> \
+		$(PANTAVISOR_PKGDIR)/etc/pantavisor.config
+	@mkdir -p $(PANTAVISOR_PKGDIR)/etc/lxc
+	@echo 'lxc.lxcpath = /usr/var/lib/lxc' > $(PANTAVISOR_PKGDIR)/etc/lxc/lxc.conf
+	@$(call touch)
 
 # ----------------------------------------------------------------------------
 # Target-Install
@@ -97,6 +143,15 @@ endif
 
 	@$(call install_tree, pantavisor, 0, 0, -, /etc/pantavisor)
 	@$(call install_alternative, pantavisor, 0, 0, 0644, /etc/pantavisor.config)
+	@$(call install_alternative, pantavisor, 0, 0, 0644, /etc/lxc/lxc.conf)
+
+	@$(call install_copy, pantavisor, 0, 0, 0755, /storage)
+	@$(call install_copy, pantavisor, 0, 0, 0755, /volumes)
+	@$(call install_copy, pantavisor, 0, 0, 0755, /exports)
+	@$(call install_copy, pantavisor, 0, 0, 0755, /writable)
+	@$(call install_link, pantavisor, run/pantavisor/pv, /pv)
+	@$(call install_link, pantavisor, run/pantavisor/media, /media)
+	@$(call install_link, pantavisor, run/pantavisor/configs, /configs)
 
 	@$(call install_finish, pantavisor)
 

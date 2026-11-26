@@ -1,0 +1,15 @@
+# Selected by LXC_SERIES when PANTAVISOR is enabled. From
+# github.com/pantavisor/lxc (stable-6.0, bfa6810a), rebased onto 6.0.6;
+# the pv_export.h header and the rebase notes are left out.
+0001-Add-set_container_type-API-for-Pantavisor.patch
+0002-Add-lxc.rootfs.bdev_type-config-key.patch
+0003-Add-realpath_x-for-virtual-root-path-resolution.patch
+0004-add-origin-mkdir-mount-option-for-source-directory-c.patch
+0005-enhance-lxc_string_split_quoted-to-handle-escaped-ch.patch
+0006-change-cgroup-prefix-from-lxc.payload.-to-lxc.patch
+0007-support-hook-commands-with-parameters.patch
+0008-allow-overlay-mount-entries-with-upper-workdir-outsi.patch
+0009-support-exports-mounts-for-Pantavisor.patch
+0010-block-SIGCHLD-in-run_buffer-to-prevent-child-reaping.patch
+0011-conf-match-pivot_root-mount-propagation-in-lxc_chroo.patch
+0012-confile-add-lxc.tty.min-as-lower-bound-of-tty-alloca.patch

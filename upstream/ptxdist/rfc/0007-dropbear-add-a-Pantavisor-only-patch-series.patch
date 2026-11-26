@@ -1,0 +1,273 @@
+From e3e7faee7d03fda95f893e3b8382b3cf72e7dd4f Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Tue, 24 Nov 2026 10:28:06 -0300
+Subject: [RFC PATCH 7/8] dropbear: add a Pantavisor-only patch series
+
+Pantavisor runs dropbear in its initramfs as a debug SSH server:
+
+  dropbear -F -p 0.0.0.0:8222 -n <authorized_keys> -R -c <command>
+
+The user name the client logs in with picks the container the forced
+command enters, and there is no passwd database to look those names
+up in. The patch adds -n <file>: any user name is accepted,
+authenticated against <file>, and runs as root. It requires a forced
+command and disables password logins. It is forward-ported from
+github.com/pantacor/dropbear-pv.
+
+Nothing but Pantavisor uses it, so it goes into series.pantavisor and a
+hidden DROPBEAR_SERIES picks it when PANTAVISOR is enabled, as for
+busybox. PTXdist has no dropbear patches today, so the plain series
+file is empty: without one, PTXdist would apply every patch in the
+directory.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ ...er-mode-with-a-single-authorized_key.patch | 196 ++++++++++++++++++
+ patches/dropbear-2026.94/series               |   2 +
+ patches/dropbear-2026.94/series.pantavisor    |   3 +
+ rules/dropbear.in                             |   7 +
+ 4 files changed, 208 insertions(+)
+ create mode 100644 patches/dropbear-2026.94/0200-svr-add-n-any-user-mode-with-a-single-authorized_key.patch
+ create mode 100644 patches/dropbear-2026.94/series
+ create mode 100644 patches/dropbear-2026.94/series.pantavisor
+
+diff --git a/patches/dropbear-2026.94/0200-svr-add-n-any-user-mode-with-a-single-authorized_key.patch b/patches/dropbear-2026.94/0200-svr-add-n-any-user-mode-with-a-single-authorized_key.patch
+new file mode 100644
+index 000000000..fa28dad8d
+--- /dev/null
++++ b/patches/dropbear-2026.94/0200-svr-add-n-any-user-mode-with-a-single-authorized_key.patch
+@@ -0,0 +1,196 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Alexander Sack <asac@pantacor.com>
++Date: Thu, 29 Oct 2026 18:01:59 -0300
++Subject: [PATCH] svr: add -n any user mode with a single authorized_keys file
++
++Pantavisor runs dropbear as a debug SSH server in its initramfs, where
++there is no passwd database worth the name. It starts it with
++
++  dropbear -F -p 0.0.0.0:8222 -n <authorized_keys> -R -c <command>
++
++and uses the user name the client logs in with to pick which container
++the forced command enters.
++
++-n <file> accepts any user name, authenticates it against <file> instead
++of ~/.ssh/authorized_keys and runs the session as root with /tmp as the
++home directory. Every user name maps to root, so -n requires a forced
++command (-c) and disables password logins.
++
++The authorized_keys file and every directory up to / must still be owned
++by root and not writable by group or others. Pantavisor keeps the file
++below /run, which it mounts with mode 0755 since 031-rc9.
++
++Forward-ported from commit 76c3c0b ("support login as "anyuser" ...") in
++https://github.com/pantacor/dropbear-pv, rewritten for the
++authorized_keys_filepath() helper and without the empty utmp entry the
++original wrote.
++
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ src/runopts.h         |  4 ++++
++ src/svr-auth.c        | 16 +++++++++++++++-
++ src/svr-authpubkey.c  |  4 ++++
++ src/svr-chansession.c | 18 ++++++++++++++++--
++ src/svr-runopts.c     | 21 +++++++++++++++++++++
++ 5 files changed, 60 insertions(+), 3 deletions(-)
++
++diff --git a/src/runopts.h b/src/runopts.h
++index 166ad4a..35bccce 100644
++--- a/src/runopts.h
+++++ b/src/runopts.h
++@@ -138,6 +138,10 @@ typedef struct svr_runopts {
++ 
++ 	int pass_on_env;
++ 
+++	/* -n: accept any user name, authenticated against one
+++	 * authorized_keys file and run as root */
+++	char *anyuser_authorized_keys;
+++
++ } svr_runopts;
++ 
++ extern svr_runopts svr_opts;
++diff --git a/src/svr-auth.c b/src/svr-auth.c
++index ca19382..cf81402 100644
++--- a/src/svr-auth.c
+++++ b/src/svr-auth.c
++@@ -38,6 +38,16 @@
++ 
++ static int checkusername(const char *username, unsigned int userlen);
++ 
+++/* -n: the user need not exist in the passwd database */
+++static void fill_anyuser(const char *username) {
+++	ses.authstate.pw_uid = 0;
+++	ses.authstate.pw_gid = 0;
+++	ses.authstate.pw_name = m_strdup(username);
+++	ses.authstate.pw_dir = m_strdup("/tmp");
+++	ses.authstate.pw_shell = m_strdup("/bin/sh");
+++	ses.authstate.pw_passwd = m_strdup("!!");
+++}
+++
++ /* initialise the first time for a session, resetting all parameters */
++ void svr_authinitialise() {
++ 	memset(&ses.authstate, 0, sizeof(ses.authstate));
++@@ -243,7 +253,11 @@ static int checkusername(const char *username, unsigned int userlen) {
++ 
++ 	if (ses.authstate.username == NULL) {
++ 		/* first request */
++-		fill_passwd(username);
+++		if (svr_opts.anyuser_authorized_keys) {
+++			fill_anyuser(username);
+++		} else {
+++			fill_passwd(username);
+++		}
++ 		ses.authstate.username = m_strdup(username);
++ 	} else {
++ 		/* check username hasn't changed */
++diff --git a/src/svr-authpubkey.c b/src/svr-authpubkey.c
++index 938b52d..1a97739 100644
++--- a/src/svr-authpubkey.c
+++++ b/src/svr-authpubkey.c
++@@ -465,6 +465,10 @@ static char *authorized_keys_filepath() {
++ 	char *pathname = NULL, *dir = NULL;
++ 	const char *filename = "authorized_keys";
++ 
+++	if (svr_opts.anyuser_authorized_keys) {
+++		return m_strdup(svr_opts.anyuser_authorized_keys);
+++	}
+++
++ 	dir = expand_homedir_path_home(svr_opts.authorized_keys_dir,
++ 				       ses.authstate.pw_dir);
++ 
++diff --git a/src/svr-chansession.c b/src/svr-chansession.c
++index a2ea1fc..36c2bc6 100644
++--- a/src/svr-chansession.c
+++++ b/src/svr-chansession.c
++@@ -281,7 +281,10 @@ static int newchansess(struct Channel *channel) {
++ static struct logininfo* 
++ chansess_login_alloc(const struct ChanSess *chansess) {
++ 	struct logininfo * li;
++-	li = login_alloc_entry(chansess->pid, ses.authstate.username,
+++	/* -n users are not in the passwd database, which
+++	 * login_init_entry() would look the name up in */
+++	li = login_alloc_entry(chansess->pid,
+++			svr_opts.anyuser_authorized_keys ? NULL : ses.authstate.username,
++ 			svr_ses.remotehost, chansess->tty);
++ 	return li;
++ }
++@@ -593,6 +596,7 @@ static int sessionpty(struct ChanSess * chansess) {
++ 	unsigned int termlen;
++ 	char namebuf[65];
++ 	struct passwd * pw = NULL;
+++	struct passwd anyuser_pw;
++ 
++ 	TRACE(("enter sessionpty"))
++ 
++@@ -622,7 +626,17 @@ static int sessionpty(struct ChanSess * chansess) {
++ 		dropbear_exit("Out of memory"); /* TODO disconnect */
++ 	}
++ 
++-	pw = getpwnam(ses.authstate.pw_name);
+++	if (svr_opts.anyuser_authorized_keys) {
+++		memset(&anyuser_pw, 0, sizeof(anyuser_pw));
+++		anyuser_pw.pw_name = ses.authstate.pw_name;
+++		anyuser_pw.pw_uid = ses.authstate.pw_uid;
+++		anyuser_pw.pw_gid = ses.authstate.pw_gid;
+++		anyuser_pw.pw_dir = ses.authstate.pw_dir;
+++		anyuser_pw.pw_shell = ses.authstate.pw_shell;
+++		pw = &anyuser_pw;
+++	} else {
+++		pw = getpwnam(ses.authstate.pw_name);
+++	}
++ 	if (!pw)
++ 		dropbear_exit("getpwnam failed after succeeding previously");
++ 	pty_setowner(pw, chansess->tty);
++diff --git a/src/svr-runopts.c b/src/svr-runopts.c
++index 2baec6b..752450b 100644
++--- a/src/svr-runopts.c
+++++ b/src/svr-runopts.c
++@@ -104,6 +104,9 @@ static void printhelp(const char * progname) {
++ 					"		(default port is %s if none specified)\n"
++ 					"-P PidFile	Create pid file PidFile\n"
++ 					"		(default %s)\n"
+++					"-n authorized_keys\n"
+++					"		Accept any user name, authenticated against this\n"
+++					"		authorized_keys file and run as root; needs -c\n"
++ #ifdef SO_BINDTODEVICE
++ 					"-l <interface>\n"
++ 					"		interface to bind on\n"
++@@ -195,6 +198,7 @@ void svr_getopts(int argc, char ** argv) {
++         svr_opts.pubkey_plugin_options = NULL;
++ #endif
++ 	svr_opts.pass_on_env = 0;
+++	svr_opts.anyuser_authorized_keys = NULL;
++ 	svr_opts.reexec_childpipe = -1;
++ 
++ #ifndef DISABLE_ZLIB
++@@ -372,6 +376,9 @@ void svr_getopts(int argc, char ** argv) {
++ 					debug_trace++;
++ 					break;
++ #endif
+++				case 'n':
+++					next = &svr_opts.anyuser_authorized_keys;
+++					break;
++ 				case 'V':
++ 					print_version();
++ 					exit(EXIT_SUCCESS);
++@@ -501,6 +508,20 @@ void svr_getopts(int argc, char ** argv) {
++ 		dropbear_exit("Bad -D");
++ 	}
++ 
+++	if (svr_opts.anyuser_authorized_keys) {
+++#if !DROPBEAR_SVR_PUBKEY_AUTH
+++		dropbear_exit("-n needs public key authentication");
+++#endif
+++		/* every user name maps to root, so the forced command is the
+++		 * only thing that decides what a session can do */
+++		if (!svr_opts.forced_command) {
+++			dropbear_exit("-n needs -c");
+++		}
+++		svr_opts.noauthpass = 1;
+++		dropbear_log(LOG_INFO, "Any user mode, keys from '%s'",
+++				svr_opts.anyuser_authorized_keys);
+++	}
+++
++ #if DROPBEAR_PLUGIN
++ 	if (pubkey_plugin) {
++ 		if (svr_opts.multiauthmethod) {
+diff --git a/patches/dropbear-2026.94/series b/patches/dropbear-2026.94/series
+new file mode 100644
+index 000000000..e476e7da2
+--- /dev/null
++++ b/patches/dropbear-2026.94/series
+@@ -0,0 +1,2 @@
++# Empty on purpose: without a series file PTXdist would apply every patch
++# here. The Pantavisor patches are in series.pantavisor (DROPBEAR_SERIES).
+diff --git a/patches/dropbear-2026.94/series.pantavisor b/patches/dropbear-2026.94/series.pantavisor
+new file mode 100644
+index 000000000..00650bee4
+--- /dev/null
++++ b/patches/dropbear-2026.94/series.pantavisor
+@@ -0,0 +1,3 @@
++# Selected by DROPBEAR_SERIES when PANTAVISOR is enabled.
++# Any-user mode (-n), forward-ported from github.com/pantacor/dropbear-pv
++0200-svr-add-n-any-user-mode-with-a-single-authorized_key.patch
+diff --git a/rules/dropbear.in b/rules/dropbear.in
+index ca4640682..b3b38f1ea 100644
+--- a/rules/dropbear.in
++++ b/rules/dropbear.in
+@@ -423,6 +423,13 @@ config DROPBEAR_SCP
+ comment "OpenSSH scp is selected!"
+ 	depends on OPENSSH_SCP
+ 
++# The -n patch is in series.pantavisor; every other build applies the
++# empty series.
++config DROPBEAR_SERIES
++	string
++	default "series.pantavisor" if PANTAVISOR
++	default "series"
++
+ comment "Runtime options                ---"
+ 
+ config DROPBEAR_GENKEYS
+-- 
+2.43.0
+

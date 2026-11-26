@@ -15,20 +15,19 @@ HOST_PACKAGES-$(PTXCONF_HOST_PV_PVR_SDK) += host-pv-pvr-sdk
 # Paths and names
 #
 # From https://pantavisor-ci.s3.amazonaws.com/meta-pantavisor/containers-releases.json
-# (the list behind pantavisor.io/downloads). Only release candidates are
-# published there so far.
-HOST_PV_PVR_SDK_VERSION	:= 031-rc2
+# (the list behind pantavisor.io/downloads).
+HOST_PV_PVR_SDK_VERSION	:= 031
 ifdef PTXCONF_ARCH_ARM64
 HOST_PV_PVR_SDK_MACHINE	:= armv8
-HOST_PV_PVR_SDK_SHA256	:= 46617f4f47d1660874903198f85e2b3e396767dc08b0513ab50bd1137be54e01
+HOST_PV_PVR_SDK_SHA256	:= 5958a9a69e4d92f0f81b707855b82e8c87a1cb46b037fc6ee4deb5ae7082c556
 endif
 ifdef PTXCONF_ARCH_ARM
 HOST_PV_PVR_SDK_MACHINE	:= armv6
-HOST_PV_PVR_SDK_SHA256	:= 238ca53481c6c23b68bb48e6c8b117a65b18fe5294783c0fc4b7320c7e4bb38c
+HOST_PV_PVR_SDK_SHA256	:= 90710ddac1f4366cdccc2b00605d80bd48bcaaacdfe73e1887361e005299a6d4
 endif
 ifdef PTXCONF_ARCH_X86_64
 HOST_PV_PVR_SDK_MACHINE	:= x86_64
-HOST_PV_PVR_SDK_SHA256	:= b584aabae30e53f1b0caf16007fcd6b52d5064628141833b6ca3088475038bc0
+HOST_PV_PVR_SDK_SHA256	:= 02d26d63a0d5c2cdf4603ab8fcd13feadc83658b3ca5e29c71429d1730efb55c
 endif
 HOST_PV_PVR_SDK		:= pv-pvr-sdk-$(HOST_PV_PVR_SDK_MACHINE)-$(HOST_PV_PVR_SDK_VERSION)
 HOST_PV_PVR_SDK_SUFFIX	:= pvrexport.tgz

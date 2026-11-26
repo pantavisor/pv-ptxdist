@@ -1,0 +1,2 @@
+# Empty on purpose: without a series file PTXdist would apply every patch
+# here. The Pantavisor patches are in series.pantavisor (DROPBEAR_SERIES).

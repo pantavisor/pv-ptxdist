@@ -1,0 +1,353 @@
+From 35ee69eac5d13e01bfddb89d7fa3b1fdb190ba67 Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Tue, 24 Nov 2026 16:30:14 -0300
+Subject: [RFC PATCH 4/8] libevent22: new package
+
+Pantavisor talks to its cloud over HTTPS through evhttp on an mbed TLS
+bufferevent. That backend only exists in libevent 2.2, and 2.2 has only
+alpha releases. Bumping libevent would put an alpha under every package
+that uses it and change their soname, so add 2.2 as a second package
+instead, which only its users link:
+
+ - static libraries only, with position-independent code, and nothing
+   installed on the target;
+ - installed to a private sysroot prefix, /usr/lib/libevent-2.2, so the
+   headers, libevent.so and libevent.pc of libevent 2.1 stay untouched
+   and both packages can be enabled at once. Users add that prefix to
+   their search paths.
+
+Options as for libevent, plus mbed TLS instead of OpenSSL and an option
+for libevent's debug mode. The mbed TLS backend is built against
+mbedtls36, the library its users link. configure's mbedtls check links
+-lmbedtls -lmbedcrypto -lmbedx509, an order only shared libraries
+forgive, so have_mbedtls and MBEDTLS_LIBS are preset.
+
+Two patches: a fix for evhttp crashing when a connection on a TLS
+bufferevent is freed with callbacks still queued, and the CMake debug
+postfix that the autotools .pc files carry by mistake.
+
+Once 2.2 has a stable release, this package goes and libevent is
+bumped.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ .../evhttp-null-guard-freed-conn.patch        |  63 +++++++++++
+ .../pkg-config-drop-cmake-debug-postfix.patch |  83 +++++++++++++++
+ patches/libevent22-2.2.2-alpha/series         |   4 +
+ rules/libevent22.in                           |  25 +++++
+ rules/libevent22.make                         | 100 ++++++++++++++++++
+ 5 files changed, 275 insertions(+)
+ create mode 100644 patches/libevent22-2.2.2-alpha/evhttp-null-guard-freed-conn.patch
+ create mode 100644 patches/libevent22-2.2.2-alpha/pkg-config-drop-cmake-debug-postfix.patch
+ create mode 100644 patches/libevent22-2.2.2-alpha/series
+ create mode 100644 rules/libevent22.in
+ create mode 100644 rules/libevent22.make
+
+diff --git a/patches/libevent22-2.2.2-alpha/evhttp-null-guard-freed-conn.patch b/patches/libevent22-2.2.2-alpha/evhttp-null-guard-freed-conn.patch
+new file mode 100644
+index 000000000..537ca76c6
+--- /dev/null
++++ b/patches/libevent22-2.2.2-alpha/evhttp-null-guard-freed-conn.patch
+@@ -0,0 +1,63 @@
++From: Aníbal Portero Hermida <anibal.portero@pantacor.com>
++Subject: [PATCH] evhttp: guard callbacks against NULL evcon; demote replacefd assert
++
++Two fixes for evhttp used with SSL (mbedTLS) bufferevents:
++
++1. When evhttp_connection_free() is called while a deferred bufferevent
++   callback is still queued, the cbarg is zeroed before the callback fires.
++   All three evhttp bufferevent callbacks dereference evcon immediately,
++   causing a NULL+16 SIGSEGV.  Add a NULL guard at the top of each callback
++   so that stale deferred events are silently ignored.
++
++2. evhttp_connection_reset_hard_ calls bufferevent_replacefd(bev, -1) to
++   detach the fd before reconnecting.  SSL bufferevents (mbedTLS) do not
++   support replacefd and return an error, triggering the fatal
++   EVUTIL_ASSERT(!err && "setfd") and crashing the process.  The libevent
++   authors left a FIXME comment on that line.  Demote the assertion to a
++   debug log so the process survives — the SSL bufferevent cleans up the
++   underlying fd correctly on its own when freed.
++
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ http.c | 9 +++++++++
++ 1 file changed, 9 insertions(+), 0 deletions(-)
++
++--- a/http.c
+++++ b/http.c
++@@ -907,6 +907,8 @@
++ evhttp_write_cb(struct bufferevent *bufev, void *arg)
++ {
++ 	struct evhttp_connection *evcon = arg;
+++	if (!evcon)
+++		return;
++
++ 	/* Activate our call back */
++ 	if (evcon->cb != NULL)
++@@ -1232,6 +1234,8 @@
++ evhttp_read_cb(struct bufferevent *bufev, void *arg)
++ {
++ 	struct evhttp_connection *evcon = arg;
+++	if (!evcon)
+++		return;
++ 	struct evhttp_request *req = TAILQ_FIRST(&evcon->requests);
++
++ 	/* Cancel if it's pending. */
++@@ -1448,7 +1452,8 @@
++
++ 	/** FIXME: manipulating with fd is unwanted */
++ 	err = bufferevent_replacefd(evcon->bufev, -1);
++-	EVUTIL_ASSERT(!err && "setfd");
+++	if (err)
+++		event_debug(("%s: bufferevent_replacefd failed (SSL bufferevent?)", __func__));
++
++ 	/* we need to clean up any buffered data */
++ 	tmp = bufferevent_get_output(evcon->bufev);
++@@ -1592,6 +1597,8 @@
++ evhttp_error_cb(struct bufferevent *bufev, short what, void *arg)
++ {
++ 	struct evhttp_connection *evcon = arg;
+++	if (!evcon)
+++		return;
++ 	struct evhttp_request *req = TAILQ_FIRST(&evcon->requests);
++
++ 	switch (evcon->state) {
+diff --git a/patches/libevent22-2.2.2-alpha/pkg-config-drop-cmake-debug-postfix.patch b/patches/libevent22-2.2.2-alpha/pkg-config-drop-cmake-debug-postfix.patch
+new file mode 100644
+index 000000000..fd6d5b4ee
+--- /dev/null
++++ b/patches/libevent22-2.2.2-alpha/pkg-config-drop-cmake-debug-postfix.patch
+@@ -0,0 +1,83 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++Date: Wed, 11 Nov 2026 19:50:29 -0300
++Subject: [PATCH] pkg-config: drop the CMake debug postfix from the autotools
++ .pc files
++
++The 2.2.1-alpha and 2.2.2-alpha .pc.in files carry CMake's
++@CMAKE_DEBUG_POSTFIX@, which autotools never substitutes, so pkg-config
++consumers link against -levent_core@CMAKE_DEBUG_POSTFIX@ and their
++configure link tests fail.
++
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ libevent_core.pc.in     | 2 +-
++ libevent_extra.pc.in    | 2 +-
++ libevent_mbedtls.pc.in  | 2 +-
++ libevent_openssl.pc.in  | 2 +-
++ libevent_pthreads.pc.in | 2 +-
++ 5 files changed, 5 insertions(+), 5 deletions(-)
++
++diff --git a/libevent_core.pc.in b/libevent_core.pc.in
++index eca8dab..5b56861 100644
++--- a/libevent_core.pc.in
+++++ b/libevent_core.pc.in
++@@ -8,6 +8,6 @@ includedir=@includedir@
++ Name: libevent_core
++ Description: libevent_core
++ Version: @VERSION@
++-Libs: -L${libdir} -levent_core@CMAKE_DEBUG_POSTFIX@
+++Libs: -L${libdir} -levent_core
++ Libs.private: @LIBS@
++ Cflags: -I${includedir}
++diff --git a/libevent_extra.pc.in b/libevent_extra.pc.in
++index 03deca7..fa9c5ab 100644
++--- a/libevent_extra.pc.in
+++++ b/libevent_extra.pc.in
++@@ -9,6 +9,6 @@ Name: libevent_extra
++ Description: libevent_extra
++ Version: @VERSION@
++ Requires: libevent_core
++-Libs: -L${libdir} -levent_extra@CMAKE_DEBUG_POSTFIX@
+++Libs: -L${libdir} -levent_extra
++ Libs.private: @LIBS@
++ Cflags: -I${includedir}
++diff --git a/libevent_mbedtls.pc.in b/libevent_mbedtls.pc.in
++index 89479a1..690ceb4 100644
++--- a/libevent_mbedtls.pc.in
+++++ b/libevent_mbedtls.pc.in
++@@ -9,6 +9,6 @@ Name: libevent_mbedtls
++ Description: libevent_mbedtls adds mbedtls-based TLS support to libevent
++ Version: @VERSION@
++ Requires: libevent_core
++-Libs: -L${libdir} -levent_mbedtls@CMAKE_DEBUG_POSTFIX@
+++Libs: -L${libdir} -levent_mbedtls
++ Libs.private: -lmbedtls -lmbedx509 @LIBS@
++ Cflags: -I${includedir}
++diff --git a/libevent_openssl.pc.in b/libevent_openssl.pc.in
++index f9da5ea..b09ecca 100644
++--- a/libevent_openssl.pc.in
+++++ b/libevent_openssl.pc.in
++@@ -10,6 +10,6 @@ Description: libevent_openssl adds openssl-based TLS support to libevent
++ Version: @VERSION@
++ Requires: libevent_core
++ Requires.private: libssl
++-Libs: -L${libdir} -levent_openssl@CMAKE_DEBUG_POSTFIX@
+++Libs: -L${libdir} -levent_openssl
++ Libs.private: @LIBS@
++ Cflags: -I${includedir}
++diff --git a/libevent_pthreads.pc.in b/libevent_pthreads.pc.in
++index 22f713d..8ac5642 100644
++--- a/libevent_pthreads.pc.in
+++++ b/libevent_pthreads.pc.in
++@@ -9,6 +9,6 @@ Name: libevent_pthreads
++ Description: libevent_pthreads adds pthreads-based threading support to libevent
++ Version: @VERSION@
++ Requires: libevent_core
++-Libs: -L${libdir} -levent_pthreads@CMAKE_DEBUG_POSTFIX@
+++Libs: -L${libdir} -levent_pthreads
++ Libs.private: @CMAKE_THREAD_LIBS_INIT@ @LIBS@
++ Cflags: -I${includedir}
++-- 
++2.43.0
++
+diff --git a/patches/libevent22-2.2.2-alpha/series b/patches/libevent22-2.2.2-alpha/series
+new file mode 100644
+index 000000000..2862cd190
+--- /dev/null
++++ b/patches/libevent22-2.2.2-alpha/series
+@@ -0,0 +1,4 @@
++# from meta-pantavisor recipes-pv/libevent/files; applies unchanged to 2.2.2-alpha
++evhttp-null-guard-freed-conn.patch
++# the do_configure:prepend sed in meta-pantavisor's libevent_2.2.1.bb
++pkg-config-drop-cmake-debug-postfix.patch
+diff --git a/rules/libevent22.in b/rules/libevent22.in
+new file mode 100644
+index 000000000..d5171bf6f
+--- /dev/null
++++ b/rules/libevent22.in
+@@ -0,0 +1,25 @@
++## SECTION=system_libraries
++
++menuconfig LIBEVENT22
++	tristate
++	prompt "libevent 2.2 (static)         "
++	select LIBC_RT
++	select GCCLIBS_GCC_S
++	select MBEDTLS36
++	help
++	  libevent 2.2 with its mbed TLS bufferevent backend, which the
++	  libevent package (2.1) does not have, built against mbedtls36. Built as static libraries
++	  in a private sysroot prefix, /usr/lib/libevent-2.2, so it can
++	  coexist with libevent 2.1; nothing is installed on the target.
++	  Packages that need it, such as Pantavisor, add that prefix to
++	  their search paths.
++
++if LIBEVENT22
++
++config LIBEVENT22_DEBUG_MODE
++	bool
++	prompt "enable debug mode"
++	help
++	  Extra runtime checks for API misuse.
++
++endif
+diff --git a/rules/libevent22.make b/rules/libevent22.make
+new file mode 100644
+index 000000000..f51024c64
+--- /dev/null
++++ b/rules/libevent22.make
+@@ -0,0 +1,100 @@
++# -*-makefile-*-
++#
++# Copyright (C) 2026 by Fernando Luiz Cola <fernando.luiz@pantacor.com>
++# Based on rules/libevent.make by Michael Olbrich and Marc Kleine-Budde.
++#
++# For further information about the PTXdist project and license conditions
++# see the README file.
++#
++
++#
++# We provide this package
++#
++PACKAGES-$(PTXCONF_LIBEVENT22) += libevent22
++
++#
++# Paths and names
++#
++# 2.2 has only alpha releases so far; drop this package for a libevent bump
++# once 2.2 is stable.
++LIBEVENT22_VERSION	:= 2.2.2-alpha
++LIBEVENT22_API		:= 2.2
++LIBEVENT22_SHA256	:= 4ab1b369bcb5af0c5971b8ade4e95a2c1326f6d0dc1ba75d620bf0331c3184a8
++LIBEVENT22		:= libevent22-$(LIBEVENT22_VERSION)
++LIBEVENT22_SUFFIX	:= tar.gz
++LIBEVENT22_URL		:= https://github.com/libevent/libevent/releases/download/release-$(LIBEVENT22_VERSION)/libevent-$(LIBEVENT22_VERSION).$(LIBEVENT22_SUFFIX)
++LIBEVENT22_SOURCE	:= $(SRCDIR)/libevent-$(LIBEVENT22_VERSION).$(LIBEVENT22_SUFFIX)
++LIBEVENT22_DIR		:= $(BUILDDIR)/$(LIBEVENT22)
++LIBEVENT22_LICENSE	:= BSD-3-Clause AND 0BSD AND MIT
++LIBEVENT22_LICENSE_FILES	:= \
++	file://LICENSE;md5=eaea438df011ea096feec284927c59e0
++
++# Private sysroot prefix: libevent 2.1 installs the same headers,
++# libevent.so and libevent.pc to /usr.
++LIBEVENT22_PREFIX	:= /usr/lib/libevent-$(LIBEVENT22_API)
++
++# ----------------------------------------------------------------------------
++# Prepare
++# ----------------------------------------------------------------------------
++
++# mbedtls36's private prefix (MBEDTLS36_PREFIX), spelled out because rule
++# files are not included in a fixed order.
++LIBEVENT22_MBEDTLS_PREFIX := $(PTXDIST_SYSROOT_TARGET)/usr/lib/mbedtls-3.6
++LIBEVENT22_CPPFLAGS	:= -I$(LIBEVENT22_MBEDTLS_PREFIX)/include
++LIBEVENT22_LDFLAGS	:= -L$(LIBEVENT22_MBEDTLS_PREFIX)/lib
++
++# configure's mbedtls check links -lmbedtls -lmbedcrypto -lmbedx509, an order
++# only shared libraries forgive: x509 needs crypto. A preset have_mbedtls
++# skips that check.
++LIBEVENT22_CONF_ENV	:= \
++	$(CROSS_ENV) \
++	have_mbedtls=yes \
++	MBEDTLS_LIBS="-lmbedtls -lmbedx509 -lmbedcrypto"
++
++# The directory options follow CROSS_AUTOCONF_USR, whose --libdir they
++# override.
++LIBEVENT22_CONF_TOOL	:= autoconf
++LIBEVENT22_CONF_OPT	:= \
++	$(CROSS_AUTOCONF_USR) \
++	--bindir=$(LIBEVENT22_PREFIX)/bin \
++	--includedir=$(LIBEVENT22_PREFIX)/include \
++	--libdir=$(LIBEVENT22_PREFIX)/lib \
++	--disable-gcc-warnings \
++	--enable-gcc-hardening \
++	--enable-thread-support \
++	--disable-malloc-replacement \
++	--disable-openssl \
++	--enable-mbedtls \
++	--$(call ptx/endis, PTXCONF_LIBEVENT22_DEBUG_MODE)-debug-mode \
++	--enable-libevent-install \
++	--disable-libevent-regress \
++	--disable-samples \
++	--enable-function-sections \
++	--disable-verbose-debug \
++	--enable-clock-gettime \
++	--disable-shared \
++	--enable-static \
++	--enable-pic \
++	$(GLOBAL_LARGE_FILE_OPTION) \
++	--disable-doxygen-doc \
++	--disable-doxygen-dot \
++	--disable-doxygen-man \
++	--disable-doxygen-rtf \
++	--disable-doxygen-xml \
++	--disable-doxygen-chm \
++	--disable-doxygen-chi \
++	--disable-doxygen-html \
++	--disable-doxygen-ps \
++	--disable-doxygen-pdf \
++	--$(call ptx/endis, PTXDIST_Y2038)-year2038
++
++# ----------------------------------------------------------------------------
++# Target-Install
++# ----------------------------------------------------------------------------
++
++# Static only: users link what they need, nothing goes on the target.
++$(STATEDIR)/libevent22.targetinstall:
++	@$(call targetinfo)
++	@$(call touch)
++
++# vim: syntax=make
+-- 
+2.43.0
+

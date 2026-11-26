@@ -1,0 +1,120 @@
+From 087a69a379c2d33a7f727e1e165fccf40b0a79a8 Mon Sep 17 00:00:00 2001
+From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+Date: Tue, 24 Nov 2026 15:56:20 -0300
+Subject: [RFC PATCH 2/8] picohttpparser: new package
+
+picohttpparser is the HTTP request and response parser from h2o.
+Pantavisor uses it. Upstream has no releases, so take the revision
+Pantavisor's fork is based on (066d2b1).
+
+Upstream has no build system for the library either: its Makefile only
+builds the tests, and the README expects users to copy
+picohttpparser.{c,h}. The rule builds the static library itself, with
+position-independent code, as Pantavisor links it into its executables
+and a plugin, and with -O2 -DNDEBUG as a CMake release build would.
+Nothing is installed on the target.
+
+Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
+---
+ rules/picohttpparser.in   |  8 +++++
+ rules/picohttpparser.make | 73 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 81 insertions(+)
+ create mode 100644 rules/picohttpparser.in
+ create mode 100644 rules/picohttpparser.make
+
+diff --git a/rules/picohttpparser.in b/rules/picohttpparser.in
+new file mode 100644
+index 000000000..7ccbe3bc1
+--- /dev/null
++++ b/rules/picohttpparser.in
+@@ -0,0 +1,8 @@
++## SECTION=system_libraries
++
++config PICOHTTPPARSER
++	tristate
++	prompt "picohttpparser"
++	help
++	  Tiny HTTP request/response parser, used by Pantavisor. Built as
++	  a static library only, so nothing is installed on the target.
+diff --git a/rules/picohttpparser.make b/rules/picohttpparser.make
+new file mode 100644
+index 000000000..635f1c849
+--- /dev/null
++++ b/rules/picohttpparser.make
+@@ -0,0 +1,73 @@
++# -*-makefile-*-
++#
++# Copyright (C) 2026 by Fernando Luiz Cola <fernando.luiz@pantacor.com>
++#
++# For further information about the PTXdist project and license conditions
++# see the README file.
++#
++
++#
++# We provide this package
++#
++PACKAGES-$(PTXCONF_PICOHTTPPARSER) += picohttpparser
++
++#
++# Paths and names
++#
++# Upstream has no releases. The revision meta-pantavisor builds; its
++# github.com/pantavisor/picohttpparser fork adds only a CMake build.
++PICOHTTPPARSER_VERSION	:= 2021-02-24-g066d2b1e9ab8
++PICOHTTPPARSER_SHA256	:= 63144ca669204315e62a7abc23a1f487375dc3fe4d9ebbd694a6706a09d9e535
++PICOHTTPPARSER		:= picohttpparser-$(PICOHTTPPARSER_VERSION)
++PICOHTTPPARSER_SUFFIX	:= tar.gz
++PICOHTTPPARSER_URL	:= git+https://github.com/h2o/picohttpparser.git;tag=$(PICOHTTPPARSER_VERSION)
++PICOHTTPPARSER_SOURCE	:= $(SRCDIR)/$(PICOHTTPPARSER).$(PICOHTTPPARSER_SUFFIX)
++PICOHTTPPARSER_DIR	:= $(BUILDDIR)/$(PICOHTTPPARSER)
++PICOHTTPPARSER_LICENSE	:= MIT OR Artistic-1.0-Perl
++PICOHTTPPARSER_LICENSE_FILES := \
++	file://README.md;startline=15;endline=15;md5=2de1ac72f36ce42f3efb6ff77f421343
++
++# ----------------------------------------------------------------------------
++# Prepare
++# ----------------------------------------------------------------------------
++
++# Upstream has no build system for the library (its Makefile only builds the
++# tests) and expects users to copy picohttpparser.{c,h}. Build the static
++# library here instead of carrying a build system as a patch.
++PICOHTTPPARSER_CONF_TOOL	:= NO
++
++# ----------------------------------------------------------------------------
++# Compile
++# ----------------------------------------------------------------------------
++
++# PIC: Pantavisor links it into its executables and its pv_lxc.so plugin.
++# -O2 -DNDEBUG as CMake's RelWithDebInfo; the wrapper adds -g.
++$(STATEDIR)/picohttpparser.compile:
++	@$(call targetinfo)
++	@$(call world/execute, PICOHTTPPARSER, \
++		$(CROSS_CC) -O2 -DNDEBUG -fPIC -c picohttpparser.c -o picohttpparser.o && \
++		$(CROSS_AR) rcs libpicohttpparser.a picohttpparser.o)
++	@$(call touch)
++
++# ----------------------------------------------------------------------------
++# Install
++# ----------------------------------------------------------------------------
++
++$(STATEDIR)/picohttpparser.install:
++	@$(call targetinfo)
++	@$(call world/execute, PICOHTTPPARSER, \
++		install -D -m 0644 picohttpparser.h \
++			$(PICOHTTPPARSER_PKGDIR)/usr/include/picohttpparser.h && \
++		install -D -m 0644 libpicohttpparser.a \
++			$(PICOHTTPPARSER_PKGDIR)/usr/lib/libpicohttpparser.a)
++	@$(call touch)
++
++# ----------------------------------------------------------------------------
++# Target-Install
++# ----------------------------------------------------------------------------
++
++$(STATEDIR)/picohttpparser.targetinstall:
++	@$(call targetinfo)
++	@$(call touch)
++
++# vim: syntax=make
+-- 
+2.43.0
+
