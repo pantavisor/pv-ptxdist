@@ -76,15 +76,15 @@ config PANTAVISOR_DEBUG
 
 config PANTAVISOR_DEVELOPER_TRUST
 	bool
-	default y
 	prompt "install the developer trust store"
 	help
-	  Install the "Pantavisor Dev CA" certificate to
+	  Install Pantavisor's developer certificates, "Pantavisor Dev
+	  CA" and "Pantacor Dev CA (OEM Root)", to
 	  /etc/pantavisor/pvs/trust. Pantavisor then accepts revisions
-	  signed with the development keys published for pvr
-	  (pvs.defaultkeys.tar.gz), which anyone can use. Not for
-	  production: disable it and install your own trust store in
-	  /etc/pantavisor/pvs, e.g. from projectroot.
+	  signed with the development keys published for pvr, which
+	  anyone can use. Not for production: there, leave this off and
+	  install the product's own trust store to
+	  /etc/pantavisor/pvs/trust.
 
 config PANTAVISOR_DM_CRYPT
 	bool

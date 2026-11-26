@@ -1,4 +1,4 @@
-From 2affbf8e0124004af9d0f667cc69d146efa72d4e Mon Sep 17 00:00:00 2001
+From 3ebd67782628759bb004904e1ccfd821d6d5036c Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Thu, 26 Nov 2026 17:10:11 -0300
 Subject: [RFC PATCH 8/8] pantavisor: new package
@@ -42,9 +42,10 @@ Four patches:
 
 All four are for Pantavisor upstream as well.
 
-The Pantavisor developer trust store is not installed
-(PANTAVISOR_PVS_SKIP_INSTALL=ON): a product brings its own in
-/etc/pantavisor/pvs, e.g. from projectroot.
+PANTAVISOR_DEVELOPER_TRUST, off by default, installs Pantavisor's
+developer certificates to /etc/pantavisor/pvs/trust, so that revisions
+signed with the development keys published for pvr boot. A product
+leaves it off and installs its own trust store there.
 
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
@@ -53,9 +54,9 @@ Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
  ...t-raw-ECDSA-signatures-to-DER-before.patch | 126 ++++++++++++++
  ...-cmake-link-libevent-before-mbed-TLS.patch |  33 ++++
  patches/pantavisor-031/series                 |   4 +
- rules/pantavisor.in                           | 112 +++++++++++++
+ rules/pantavisor.in                           | 124 ++++++++++++++
  rules/pantavisor.make                         | 157 ++++++++++++++++++
- 7 files changed, 495 insertions(+)
+ 7 files changed, 507 insertions(+)
  create mode 100644 patches/pantavisor-031/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch
  create mode 100644 patches/pantavisor-031/0002-plugins-pv_lxc-drop-the-unused-pv_export.h-include.patch
  create mode 100644 patches/pantavisor-031/0003-signature-convert-raw-ECDSA-signatures-to-DER-before.patch
@@ -322,10 +323,10 @@ index 000000000..d8ca4437a
 +0004-cmake-link-libevent-before-mbed-TLS.patch
 diff --git a/rules/pantavisor.in b/rules/pantavisor.in
 new file mode 100644
-index 000000000..60a6a2d86
+index 000000000..34f60863b
 --- /dev/null
 +++ b/rules/pantavisor.in
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,124 @@
 +## SECTION=applications
 +
 +menuconfig PANTAVISOR
@@ -378,6 +379,18 @@ index 000000000..60a6a2d86
 +	  the debug SSH server on port 8222, plus extra logging. Not for
 +	  production. The SSH server needs DROPBEAR, with DROPBEAR_GENKEYS
 +	  off: Pantavisor starts it with -R.
++
++config PANTAVISOR_DEVELOPER_TRUST
++	bool
++	prompt "install the developer trust store"
++	help
++	  Install Pantavisor's developer certificates, "Pantavisor Dev
++	  CA" and "Pantacor Dev CA (OEM Root)", to
++	  /etc/pantavisor/pvs/trust. Pantavisor then accepts revisions
++	  signed with the development keys published for pvr, which
++	  anyone can use. Not for production: there, leave this off and
++	  install the product's own trust store to
++	  /etc/pantavisor/pvs/trust.
 +
 +config PANTAVISOR_DM_CRYPT
 +	bool
@@ -440,7 +453,7 @@ index 000000000..60a6a2d86
 +endif
 diff --git a/rules/pantavisor.make b/rules/pantavisor.make
 new file mode 100644
-index 000000000..30986a062
+index 000000000..ebc67be67
 --- /dev/null
 +++ b/rules/pantavisor.make
 @@ -0,0 +1,157 @@
@@ -503,7 +516,7 @@ index 000000000..30986a062
 +	-DPANTAVISOR_DM_VERITY=$(call ptx/onoff, PTXCONF_PANTAVISOR_DM_VERITY) \
 +	-DPANTAVISOR_E2FSGROW_ENABLE=$(call ptx/onoff, PTXCONF_PANTAVISOR_E2FSGROW) \
 +	-DPANTAVISOR_PVCONTROL=$(call ptx/onoff, PTXCONF_PANTAVISOR_PVCONTROL) \
-+	-DPANTAVISOR_PVS_SKIP_INSTALL=ON \
++	-DPANTAVISOR_PVS_SKIP_INSTALL=$(call ptx/ifdef, PTXCONF_PANTAVISOR_DEVELOPER_TRUST,OFF,ON) \
 +	-DPANTAVISOR_PVTEST=OFF \
 +	-DPANTAVISOR_PVTX=$(call ptx/onoff, PTXCONF_PANTAVISOR_PVTX) \
 +	-DPANTAVISOR_PVTX_STATIC=OFF \

@@ -292,17 +292,18 @@ the GENKEYS patch.
       layer's ptxconfig keeps it on).
 - [x] **pantavisor in the RFC (8/8, 26 Nov 2026)**: `SECTION=applications`
       (next to rauc; `initmethod` is only shown with `INITMETHOD` on),
-      selects `LXC` and `LIBEVENT22`, no LXC 3 choice (cgroup version
-      `auto`), the initramfs layout folded in (`depends on !ROOTFS_MEDIA`,
-      since `/media` is a link), `PANTAVISOR_PVS_SKIP_INSTALL=ON` instead of
-      `PANTAVISOR_DEVELOPER_TRUST`, and the three Pantavisor patches. The
+      selects `LXC`, `LIBEVENT22` and `MBEDTLS36`, no LXC 3 choice (cgroup
+      version `auto`), the initramfs layout folded in (`depends on
+      !ROOTFS_MEDIA`, since `/media` is a link), `PANTAVISOR_DEVELOPER_TRUST`
+      off by default, and the four Pantavisor patches. The
       debug help says the SSH server needs `DROPBEAR` with `GENKEYS` off;
       selecting `DROPBEAR` would pull in `INITMETHOD` while `GENKEYS`
-      defaults to y. All 7 patches apply with `git am` on master
-      `d6b2c7954` plus GENKEYS.
+      defaults to y. All 8 patches apply with `git am` on master
+      `b387b19a6` plus GENKEYS.
 - [x] The layer folds `pantavisor-rootfs` into `pantavisor` the same way;
       its rule is now the RFC's plus the layer-only parts: the
-      `pantavisor` menu, `PANTAVISOR_DEVELOPER_TRUST` and the LXC 3 choice.
+      `pantavisor` menu and the LXC 3 choice. `PANTAVISOR_DEVELOPER_TRUST`
+      defaults to off as in the RFC; this layer's config turns it on.
       qemu-arm64: boot, SSH into all three, containers READY, signature OK,
       Pantahub online; lint shows only the 3 known warnings.
 - [x] For each: every CMake option pinned (`configure_helper.py` shows
@@ -371,8 +372,25 @@ host against 4.1.2 built with master's CMake options:
 - [ ] Port libthttp and Pantavisor to mbed TLS 4 (PSA RNG and hashes,
       `mbedtls_ecdsa_raw_to_der()`), then drop mbedtls36. libevent 2.2
       builds against 4.1.2 with one `<limits.h>` fix.
-- [ ] Build the BSP with PTXdist master plus the series (DistroKit and
-      this layer minus the rules the RFC provides): in progress.
+- [x] **PTXdist master + the series alone (26 Nov 2026).** PTXdist
+      `b387b19a6` + GENKEYS + RFC 1-8, built from git and installed in the
+      container; a worktree of this layer with every rule and patch
+      directory the RFC provides removed (what the layer becomes once it
+      lands), on DistroKit with `CONFIGFILE_VERSION` 2026.11.0 and
+      `--force` for the git version. qemu-arm64 from scratch: the
+      lxc/busybox/dropbear series come from PTXdist's `patches/`,
+      Pantavisor links mbedtls36 and libevent22 statically; boot, SSH
+      into all three, wrong key refused, containers READY, signature OK,
+      Pantahub online with a token.
+      - The version jump turned on `XORG_FONT_ADOBE_{75,100}DPI` (new
+        symbols, `default y`), which fail to configure; switched off in
+        the test copy. DistroKit's concern, not the RFC's.
+      - Without a trust store the dev-signed factory revision is refused
+        and Pantavisor reboots. Decided: `PANTAVISOR_DEVELOPER_TRUST` is
+        back in 8/8, default off. The certificates are Pantavisor's own
+        (`pvs/trust/`, MIT); only `host-pv-developer-ca`, the signing
+        keys, has no license and stays in this layer.
+- [ ] Build check after each patch of the series on master.
 
 - [ ] Build every CI device with the migrated packages: so far only
       `qemu-arm64` (build, boot, SSH tests). Still to build: `orangepi5b`,
