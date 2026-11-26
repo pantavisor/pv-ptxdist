@@ -318,6 +318,34 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
 
 ## 6. Validation before sending
 
+**Blocker found 26 Nov 2026: PTXdist master has mbedtls 4.1.2.**
+`631e99204` (Michael Olbrich, 23 Nov, "2.28.* is no longer supported and
+fails to build with cmake 4.5") bumped it past the 2.28 API that
+Pantavisor and libthttp use. The series still rebases onto master
+`b387b19a6` without conflicts, but cannot build there. Checked on the
+host against 4.1.2 built with master's CMake options:
+
+- [ ] **PTXdist master bug, worth a stand-alone patch:** with
+      `-DINSTALL_TF_PSA_CRYPTO_HEADERS=OFF` only `include/mbedtls` is
+      installed, and `#include <mbedtls/ssl.h>` fails
+      (`mbedtls/platform_util.h`, `psa/crypto.h` missing). With `ON`,
+      `psa/` and `tf-psa-crypto/` are installed and it compiles.
+- [x] **libevent22** builds its mbedtls backend against 4.1.2 with one
+      fix: `bufferevent_mbedtls.c` uses `LONG_MAX` without
+      `<limits.h>`, which mbedtls 2 headers used to pull in. All 12
+      mbedtls symbols it needs are exported. A patch for libevent22 and
+      for libevent upstream.
+- [ ] **libthttp** needs porting: `mbedtls/config.h`, `mbedtls/net.h`,
+      `mbedtls/sha256.h` are gone, `mbedtls_sha256_ret()` (removed in
+      3.0), `mbedtls_ssl_conf_rng()` (removed in 4.0, the RNG is PSA's),
+      and ctr_drbg/entropy are private in 4.x.
+- [ ] **Pantavisor** needs porting: ctr_drbg/entropy, sha256 and mpi are
+      private in 4.x; `mbedtls_ssl_conf_rng()` and
+      `mbedtls_oid_get_attr_short_name()` are gone. The ECDSA patch
+      (`patches/pantavisor-031/0003-*`) also uses mpi/asn1write; on 4.x
+      it becomes one call to the public `mbedtls_ecdsa_raw_to_der()`
+      (psa_util.h, since 3.6).
+
 - [ ] Build every CI device with the migrated packages: so far only
       `qemu-arm64` (build, boot, SSH tests). Still to build: `orangepi5b`,
       `rpi4`, `qemu-x86_64`, `orangepi5`, `rpi3`.
@@ -333,8 +361,9 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
   meta-pantavisor does (section 4).
 - A `pantavisor` init choice: Pantavisor is PID 1, so it could be an
   `INITMETHOD` choice, or a standalone initramfs package.
-- mbed TLS 2.28 LTS is end-of-life. Should Pantavisor and libthttp move to
-  mbed TLS 3.x, or to OpenSSL, before upstream depends on them?
+- mbed TLS 2.28 LTS is end-of-life, and PTXdist master moved to 4.1.2
+  (section 6): Pantavisor and libthttp have to move to mbed TLS 4 (or
+  OpenSSL) before the RFC can build on master.
 - Pantavisor-only patch series for lxc, busybox and dropbear
   (`series.pantavisor`, chosen by `<PKG>_SERIES`): nobody else's build
   changes, but whoever bumps those packages has to rebase them.
