@@ -1,7 +1,7 @@
-From c025f3d8d4ef27ec579879d3f567373e1a415e77 Mon Sep 17 00:00:00 2001
+From 35ee69eac5d13e01bfddb89d7fa3b1fdb190ba67 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 16:30:14 -0300
-Subject: [RFC PATCH 3/7] libevent22: new package
+Subject: [RFC PATCH 4/8] libevent22: new package
 
 Pantavisor talks to its cloud over HTTPS through evhttp on an mbed TLS
 bufferevent. That backend only exists in libevent 2.2, and 2.2 has only
@@ -17,22 +17,26 @@ instead, which only its users link:
    their search paths.
 
 Options as for libevent, plus mbed TLS instead of OpenSSL and an option
-for libevent's debug mode. Two patches: a fix for evhttp crashing when
-a connection on a TLS bufferevent is freed with callbacks still queued,
-and the CMake debug postfix that the autotools .pc files carry by
-mistake.
+for libevent's debug mode. The mbed TLS backend is built against
+mbedtls36, the library its users link. configure's mbedtls check links
+-lmbedtls -lmbedcrypto -lmbedx509, an order only shared libraries
+forgive, so have_mbedtls and MBEDTLS_LIBS are preset.
+
+Two patches: a fix for evhttp crashing when a connection on a TLS
+bufferevent is freed with callbacks still queued, and the CMake debug
+postfix that the autotools .pc files carry by mistake.
 
 Once 2.2 has a stable release, this package goes and libevent is
 bumped.
 
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
- .../evhttp-null-guard-freed-conn.patch        | 63 ++++++++++++++
- .../pkg-config-drop-cmake-debug-postfix.patch | 83 ++++++++++++++++++
- patches/libevent22-2.2.2-alpha/series         |  4 +
- rules/libevent22.in                           | 25 ++++++
- rules/libevent22.make                         | 86 +++++++++++++++++++
- 5 files changed, 261 insertions(+)
+ .../evhttp-null-guard-freed-conn.patch        |  63 +++++++++++
+ .../pkg-config-drop-cmake-debug-postfix.patch |  83 +++++++++++++++
+ patches/libevent22-2.2.2-alpha/series         |   4 +
+ rules/libevent22.in                           |  25 +++++
+ rules/libevent22.make                         | 100 ++++++++++++++++++
+ 5 files changed, 275 insertions(+)
  create mode 100644 patches/libevent22-2.2.2-alpha/evhttp-null-guard-freed-conn.patch
  create mode 100644 patches/libevent22-2.2.2-alpha/pkg-config-drop-cmake-debug-postfix.patch
  create mode 100644 patches/libevent22-2.2.2-alpha/series
@@ -209,7 +213,7 @@ index 000000000..2862cd190
 +pkg-config-drop-cmake-debug-postfix.patch
 diff --git a/rules/libevent22.in b/rules/libevent22.in
 new file mode 100644
-index 000000000..18045c4c9
+index 000000000..d5171bf6f
 --- /dev/null
 +++ b/rules/libevent22.in
 @@ -0,0 +1,25 @@
@@ -220,10 +224,10 @@ index 000000000..18045c4c9
 +	prompt "libevent 2.2 (static)         "
 +	select LIBC_RT
 +	select GCCLIBS_GCC_S
-+	select MBEDTLS
++	select MBEDTLS36
 +	help
 +	  libevent 2.2 with its mbed TLS bufferevent backend, which the
-+	  libevent package (2.1) does not have. Built as static libraries
++	  libevent package (2.1) does not have, built against mbedtls36. Built as static libraries
 +	  in a private sysroot prefix, /usr/lib/libevent-2.2, so it can
 +	  coexist with libevent 2.1; nothing is installed on the target.
 +	  Packages that need it, such as Pantavisor, add that prefix to
@@ -240,10 +244,10 @@ index 000000000..18045c4c9
 +endif
 diff --git a/rules/libevent22.make b/rules/libevent22.make
 new file mode 100644
-index 000000000..16315665c
+index 000000000..f51024c64
 --- /dev/null
 +++ b/rules/libevent22.make
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,100 @@
 +# -*-makefile-*-
 +#
 +# Copyright (C) 2026 by Fernando Luiz Cola <fernando.luiz@pantacor.com>
@@ -282,6 +286,20 @@ index 000000000..16315665c
 +# ----------------------------------------------------------------------------
 +# Prepare
 +# ----------------------------------------------------------------------------
++
++# mbedtls36's private prefix (MBEDTLS36_PREFIX), spelled out because rule
++# files are not included in a fixed order.
++LIBEVENT22_MBEDTLS_PREFIX := $(PTXDIST_SYSROOT_TARGET)/usr/lib/mbedtls-3.6
++LIBEVENT22_CPPFLAGS	:= -I$(LIBEVENT22_MBEDTLS_PREFIX)/include
++LIBEVENT22_LDFLAGS	:= -L$(LIBEVENT22_MBEDTLS_PREFIX)/lib
++
++# configure's mbedtls check links -lmbedtls -lmbedcrypto -lmbedx509, an order
++# only shared libraries forgive: x509 needs crypto. A preset have_mbedtls
++# skips that check.
++LIBEVENT22_CONF_ENV	:= \
++	$(CROSS_ENV) \
++	have_mbedtls=yes \
++	MBEDTLS_LIBS="-lmbedtls -lmbedx509 -lmbedcrypto"
 +
 +# The directory options follow CROSS_AUTOCONF_USR, whose --libdir they
 +# override.

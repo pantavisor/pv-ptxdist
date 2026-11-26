@@ -12,7 +12,7 @@ Patches are based on PTXdist `master`, not on a release.
 
 | Package | In this layer | Upstream form |
 |---|---|---|
-| mbedtls | Stock package, rule bumped to 2.28.10 (`rules/mbedtls.make`) | In PTXdist master (f996777be); drop with the next release |
+| mbedtls | `mbedtls36`: 3.6.8 LTS, static, private sysroot prefix; nothing selects `mbedtls` any more (`rules/mbedtls.make`, 2.28.10, is unused) | RFC 1/8: a second, static mbed TLS only Pantavisor, libthttp and libevent22 link; master's `mbedtls` is 4.1.2 |
 | dropbear | Stock 2026.94 + `-n` patch; rules with `DROPBEAR_GENKEYS` (`rules/dropbear.*`) | `DROPBEAR_GENKEYS` patch sent 24 Nov 2026; the `-n` patch goes in the RFC, applied only with Pantavisor (`DROPBEAR_SERIES`) |
 | busybox | Stock 1.38.0 + 6 Pantavisor patches | In the RFC, applied only with Pantavisor (`BUSYBOX_SERIES`) |
 | libaio | `rules/libaio.make` backport | Already in PTXdist (5017a47); drop with the next release |
@@ -34,7 +34,7 @@ Patches are based on PTXdist `master`, not on a release.
       Adds `DROPBEAR_GENKEYS` (default y); the postinst guard matches
       openssh's. Without it, enabling dropbear selects INITMETHOD, whose
       default is systemd. Checked with it off on v8a; the default path is
-      checked by reading only. RFC 6/7 sits on top of it.
+      checked by reading only. RFC 7/8 sits on top of it.
 - [x] **busybox: fix the `mdev -s` crash first.** `0304` (MODALIAS) passed
       a NULL device name to `regexec()` for PCI devices without `DEVNAME`
       as soon as `mdev.conf` had a device-name rule. `0305` skips name
@@ -53,7 +53,7 @@ Patches are based on PTXdist `master`, not on a release.
       `BUSYBOX_FEATURE_MDEV_FOLLOW_X_ROOT` now depends on PANTAVISOR. The
       RFC patches are written on PTXdist master (d6b2c7954) and apply with
       `git am`: `upstream/ptxdist/rfc/0005-busybox-*.patch` and
-      `0006-dropbear-*.patch` (RFC 5/7 and 6/7). They put the series files into PTXdist's
+      `0007-dropbear-*.patch` (RFC 6/8 and 7/8). They put the series files into PTXdist's
       `patches/busybox-1.38.0/` and a new `patches/dropbear-2026.94/`, and
       the symbols into `rules/busybox.in` and `rules/dropbear.in`.
       `FOLLOW_X_ROOT` goes into `rules/busybox.in` too, not
@@ -134,7 +134,7 @@ copied unchanged.
 
 ### Pantavisor-specific
 
-Decided 24 Nov 2026: these go into RFC 4/7 as a Pantavisor-only series
+Decided 24 Nov 2026: these go into RFC 5/8 as a Pantavisor-only series
 (`series.pantavisor`, `LXC_SERIES`), like busybox and dropbear, so they
 no longer need a config key to be safe for other builds. The reworks
 below still make them easier to argue for; `realpath_x()` has to be
@@ -205,12 +205,12 @@ Prototype in this layer (then `libevent-pv`), checked on qemu-arm64 on
 
 To do:
 
-- [x] RFC 3/7 written (`upstream/ptxdist/rfc/0003-*`): `libevent22`,
+- [x] RFC 4/8 written (`upstream/ptxdist/rfc/0004-*`): `libevent22`,
       2.2.2-alpha, mbed TLS, static only, private prefix, PTXdist's
       license string; `configure_helper.py` shows only the intended
       directory overrides. The layer's `libevent-pv` is now the same
       `libevent22`. qemu-arm64 on 2.2.2-alpha (24 Nov 2026): boot, SSH,
-      Pantahub over TLS. The `pantavisor` side goes in 7/7.
+      Pantahub over TLS. The `pantavisor` side goes in 8/8.
 - [ ] Move meta-pantavisor to 2.2.2-alpha too, so the RFC proposes what
       devices run.
 - [ ] Send the patches to libevent:
@@ -236,21 +236,25 @@ Decided 24 Nov 2026: the Pantavisor-only series covers lxc too (and
 mbedtls, until 26 Nov 2026: see below); the developer trust store stays in this layer; the initramfs layout
 folds into the pantavisor patch; the second libevent is `libevent22`.
 Order (changed 24 Nov 2026): pantavisor comes last, so that PTXdist
-builds at every commit: Pantavisor needs the lxc series. Until 7/7 the
+builds at every commit: Pantavisor needs the lxc series. Until 8/8 the
 series patches refer to a `PANTAVISOR` that does not exist yet and keep
 the stock series. The pantavisor patch drops the unused
 `#include <lxc/pv_export.h>` with a patch of its own.
 
 | # | Patch | State |
 |---|---|---|
-| 0/7 | Cover letter | to write, last |
-| 1/7 | picohttpparser: new package | written (`upstream/ptxdist/rfc/0001-*`) |
-| 2/7 | libthttp: new package | written (`0002-*`); certdata.txt from ca-certificates |
-| 3/7 | libevent22: new package (static, Pantavisor only) | written (`0003-*`) |
-| 4/7 | lxc: Pantavisor-only patch series | written (`0004-*`) |
-| 5/7 | busybox: Pantavisor-only patch series | written (`0005-*`) |
-| 6/7 | dropbear: Pantavisor-only patch series | written (`0006-*`); needs the GENKEYS patch |
-| 7/7 | pantavisor: new package, with the initramfs layout | written (`0007-*`) |
+| 0/8 | Cover letter | to write, last |
+| 1/8 | mbedtls36: new package (static 3.6 LTS, private prefix) | written (`upstream/ptxdist/rfc/0001-*`) |
+| 2/8 | picohttpparser: new package | written (`0002-*`) |
+| 3/8 | libthttp: new package | written (`0003-*`); links mbedtls36, one patch |
+| 4/8 | libevent22: new package (static, Pantavisor only) | written (`0004-*`); links mbedtls36 |
+| 5/8 | lxc: Pantavisor-only patch series | written (`0005-*`) |
+| 6/8 | busybox: Pantavisor-only patch series | written (`0006-*`) |
+| 7/8 | dropbear: Pantavisor-only patch series | written (`0007-*`); needs the GENKEYS patch |
+| 8/8 | pantavisor: new package, with the initramfs layout | written (`0008-*`); links mbedtls36 |
+
+The series is now based on PTXdist master (`b387b19a6`, 26 Nov 2026) plus
+the GENKEYS patch.
 
 - [x] **mbedtls: no RFC patch (26 Nov 2026).** The meta-pantavisor
       `pk_wrap.c` patch made ECDSA verify retry a non-DER signature as
@@ -286,7 +290,7 @@ the stock series. The pantavisor patch drops the unused
 - [x] **pantavisor**: menu reviewed. Every option has help text, nothing
       is board-specific, and the debug build is off by default (the
       layer's ptxconfig keeps it on).
-- [x] **pantavisor in the RFC (7/7, 26 Nov 2026)**: `SECTION=applications`
+- [x] **pantavisor in the RFC (8/8, 26 Nov 2026)**: `SECTION=applications`
       (next to rauc; `initmethod` is only shown with `INITMETHOD` on),
       selects `LXC` and `LIBEVENT22`, no LXC 3 choice (cgroup version
       `auto`), the initramfs layout folded in (`depends on !ROOTFS_MEDIA`,
@@ -318,7 +322,11 @@ the kernel fragments and the boot scripts. `ptxdist lint` only warns about
 
 ## 6. Validation before sending
 
-**Blocker found 26 Nov 2026: PTXdist master has mbedtls 4.1.2.**
+**PTXdist master has mbedtls 4.1.2 (found 26 Nov 2026).** Decided the
+same day: a private static mbed TLS 3.6 LTS, `mbedtls36` (RFC 1/8), like
+libevent22, instead of porting to 4.x now. 3.6 is supported until March
+2027 (BRANCHES.md), so Pantavisor and libthttp still have to move to 4.x
+within a few months.
 `631e99204` (Michael Olbrich, 23 Nov, "2.28.* is no longer supported and
 fails to build with cmake 4.5") bumped it past the 2.28 API that
 Pantavisor and libthttp use. The series still rebases onto master
@@ -335,16 +343,36 @@ host against 4.1.2 built with master's CMake options:
       `<limits.h>`, which mbedtls 2 headers used to pull in. All 12
       mbedtls symbols it needs are exported. A patch for libevent22 and
       for libevent upstream.
-- [ ] **libthttp** needs porting: `mbedtls/config.h`, `mbedtls/net.h`,
-      `mbedtls/sha256.h` are gone, `mbedtls_sha256_ret()` (removed in
-      3.0), `mbedtls_ssl_conf_rng()` (removed in 4.0, the RNG is PSA's),
-      and ctr_drbg/entropy are private in 4.x.
-- [ ] **Pantavisor** needs porting: ctr_drbg/entropy, sha256 and mpi are
-      private in 4.x; `mbedtls_ssl_conf_rng()` and
-      `mbedtls_oid_get_attr_short_name()` are gone. The ECDSA patch
-      (`patches/pantavisor-031/0003-*`) also uses mpi/asn1write; on 4.x
-      it becomes one call to the public `mbedtls_ecdsa_raw_to_der()`
-      (psa_util.h, since 3.6).
+- [x] **mbedtls36** (3.6.8, `rules/mbedtls36.*`): static, PIC, headers,
+      libs, pkg-config and CMake files under `/usr/lib/mbedtls-3.6`;
+      nothing on the target. Default configuration (renegotiation,
+      ECDSA, PSA crypto on).
+- [x] **libevent22** builds against mbedtls36 unchanged, but configure's
+      mbedtls check links `-lmbedtls -lmbedcrypto -lmbedx509`, which
+      fails with static libraries; the rule presets `have_mbedtls` and
+      `MBEDTLS_LIBS` in dependency order.
+      - [ ] Send the link-order fix to libevent upstream
+        (`m4/libevent_mbedtls.m4`).
+- [x] **libthttp**: `patches/libthttp-011-76-gff79603fc178/0001-*`
+      builds with 3.6 and still with 2.28 (`version.h` instead of
+      `config.h`, `net_sockets.h`, no `certs.h`, `mbedtls_sha256()`).
+      Host test against static 3.6.8: GET to Pantahub (TLS 1.2) and to a
+      TLS 1.3 server succeed. 3.6.6+ calls `psa_crypto_init()` in the
+      handshake itself, so no explicit call (checked by removing it).
+      - [ ] Send it to libthttp upstream.
+- [x] **Pantavisor** compiles against 3.6 unchanged; only the link order
+      needed a patch (`patches/pantavisor-031/0004-*`, libevent before
+      mbed TLS). The ECDSA patch passes the same host tests against 3.6.
+      `pantavisor` and `pv_lxc.so` need no `libmbed*.so`; the initramfs
+      ships none.
+- [x] qemu-arm64 on mbedtls36: boot, SSH into all three, containers
+      READY, signature OK, Pantahub online with a token over TLS; lint
+      unchanged.
+- [ ] Port libthttp and Pantavisor to mbed TLS 4 (PSA RNG and hashes,
+      `mbedtls_ecdsa_raw_to_der()`), then drop mbedtls36. libevent 2.2
+      builds against 4.1.2 with one `<limits.h>` fix.
+- [ ] Build the BSP with PTXdist master plus the series (DistroKit and
+      this layer minus the rules the RFC provides): in progress.
 
 - [ ] Build every CI device with the migrated packages: so far only
       `qemu-arm64` (build, boot, SSH tests). Still to build: `orangepi5b`,
@@ -361,9 +389,9 @@ host against 4.1.2 built with master's CMake options:
   meta-pantavisor does (section 4).
 - A `pantavisor` init choice: Pantavisor is PID 1, so it could be an
   `INITMETHOD` choice, or a standalone initramfs package.
-- mbed TLS 2.28 LTS is end-of-life, and PTXdist master moved to 4.1.2
-  (section 6): Pantavisor and libthttp have to move to mbed TLS 4 (or
-  OpenSSL) before the RFC can build on master.
+- mbedtls36, a second, static mbed TLS 3.6 that only Pantavisor, libthttp
+  and libevent22 link, until they are ported to 4.x (section 6); 3.6 is
+  supported until March 2027.
 - Pantavisor-only patch series for lxc, busybox and dropbear
   (`series.pantavisor`, chosen by `<PKG>_SERIES`): nobody else's build
   changes, but whoever bumps those packages has to rebase them.

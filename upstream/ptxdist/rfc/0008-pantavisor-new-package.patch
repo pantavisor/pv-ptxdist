@@ -1,7 +1,7 @@
-From a7d3947f55d94df5347b740c4430ae00eee75ce1 Mon Sep 17 00:00:00 2001
+From 2affbf8e0124004af9d0f667cc69d146efa72d4e Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Thu, 26 Nov 2026 17:10:11 -0300
-Subject: [RFC PATCH 7/7] pantavisor: new package
+Subject: [RFC PATCH 8/8] pantavisor: new package
 
 Pantavisor is a container-based init and update agent for embedded
 Linux: it runs as PID 1 from the initramfs, starts the system's
@@ -13,10 +13,11 @@ to it, with the initramfs layout it expects: /storage, /volumes,
 /exports and /writable, and /pv, /media and /configs as links into
 /run/pantavisor. So PANTAVISOR depends on !ROOTFS_MEDIA.
 
-It links libevent22 statically, from its private prefix, and libthttp
-and picohttpparser. Selecting it turns on the Pantavisor patch series
-of lxc, busybox and dropbear. The shipped pantavisor.config is adjusted
-at install time:
+It links libevent22 and mbedtls36 statically, from their private
+prefixes, and libthttp and picohttpparser, so no TLS library goes to
+the target. Selecting it turns on the Pantavisor patch series of lxc,
+busybox and dropbear. The shipped pantavisor.config is adjusted at
+install time:
 
  - PV_SECUREBOOT_HANDLERS follows PANTAVISOR_DM_VERITY; since 031 it
    is on and checks dm: volumes.
@@ -27,7 +28,7 @@ at install time:
 Pantavisor keeps its containers, so lxc-info and lxc-console find them
 without -P.
 
-Three patches:
+Four patches:
 
  - gen_version.sh takes the version from PV_GIT_DESCRIBE: a build from
    the source tarball has no .git, and git describe would describe
@@ -36,8 +37,10 @@ Three patches:
    Pantavisor's lxc fork has.
  - JWS ES256/384/512 signatures are raw R || S, but mbedtls_pk_verify()
    takes DER; convert them before verifying, so mbedtls needs no patch.
+ - link libevent before mbed TLS: libevent_mbedtls calls into it, an
+   order that static libraries need.
 
-All three are for Pantavisor upstream as well.
+All four are for Pantavisor upstream as well.
 
 The Pantavisor developer trust store is not installed
 (PANTAVISOR_PVS_SKIP_INSTALL=ON): a product brings its own in
@@ -45,16 +48,18 @@ The Pantavisor developer trust store is not installed
 
 Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 ---
- ...w-overriding-the-version-via-PV_GIT_.patch |  36 +++++
- ...-drop-the-unused-pv_export.h-include.patch |  27 ++++
- ...t-raw-ECDSA-signatures-to-DER-before.patch | 126 +++++++++++++++
- patches/pantavisor-031/series                 |   3 +
+ ...w-overriding-the-version-via-PV_GIT_.patch |  36 ++++
+ ...-drop-the-unused-pv_export.h-include.patch |  27 +++
+ ...t-raw-ECDSA-signatures-to-DER-before.patch | 126 ++++++++++++++
+ ...-cmake-link-libevent-before-mbed-TLS.patch |  33 ++++
+ patches/pantavisor-031/series                 |   4 +
  rules/pantavisor.in                           | 112 +++++++++++++
- rules/pantavisor.make                         | 151 ++++++++++++++++++
- 6 files changed, 455 insertions(+)
+ rules/pantavisor.make                         | 157 ++++++++++++++++++
+ 7 files changed, 495 insertions(+)
  create mode 100644 patches/pantavisor-031/0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch
  create mode 100644 patches/pantavisor-031/0002-plugins-pv_lxc-drop-the-unused-pv_export.h-include.patch
  create mode 100644 patches/pantavisor-031/0003-signature-convert-raw-ECDSA-signatures-to-DER-before.patch
+ create mode 100644 patches/pantavisor-031/0004-cmake-link-libevent-before-mbed-TLS.patch
  create mode 100644 patches/pantavisor-031/series
  create mode 100644 rules/pantavisor.in
  create mode 100644 rules/pantavisor.make
@@ -266,18 +271,58 @@ index 000000000..a182ebe6d
 +-- 
 +2.43.0
 +
+diff --git a/patches/pantavisor-031/0004-cmake-link-libevent-before-mbed-TLS.patch b/patches/pantavisor-031/0004-cmake-link-libevent-before-mbed-TLS.patch
+new file mode 100644
+index 000000000..973af63a1
+--- /dev/null
++++ b/patches/pantavisor-031/0004-cmake-link-libevent-before-mbed-TLS.patch
+@@ -0,0 +1,33 @@
++From 9e16648a3011b27421b54142a5928d41baa0b75e Mon Sep 17 00:00:00 2001
++From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++Date: Thu, 26 Nov 2026 17:57:14 -0300
++Subject: [PATCH] cmake: link libevent before mbed TLS
++
++libevent_mbedtls calls into mbed TLS, so with static libraries it has to
++come before them on the link line, or symbols such as mbedtls_strerror()
++stay undefined. Shared libraries hide the wrong order.
++
++Signed-off-by: Fernando Luiz Cola <fernando.luiz@pantacor.com>
++---
++ CMakeLists.txt | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/CMakeLists.txt b/CMakeLists.txt
++index 2eb4dff1..57f85119 100644
++--- a/CMakeLists.txt
+++++ b/CMakeLists.txt
++@@ -381,10 +381,10 @@ target_include_directories(pantavisor PRIVATE
++ target_link_libraries(pantavisor
++ 	${PANTAVISOR_RUNTIME_THTTP}
++ 	${PANTAVISOR_RUNTIME_PICOHTTPPARSER}
+++	${PANTAVISOR_RUNTIME_EVENT_LIBRARIES}
++ 	${PANTAVISOR_RUNTIME_MBEDTLS_LIBRARIES}
++ 	${PANTAVISOR_RUNTIME_LXC}
++ 	${PANTAVISOR_RUNTIME_ZLIB}
++-	${PANTAVISOR_RUNTIME_EVENT_LIBRARIES}
++ 	pthread
++ )
++ 
++-- 
++2.43.0
++
 diff --git a/patches/pantavisor-031/series b/patches/pantavisor-031/series
 new file mode 100644
-index 000000000..2f0820c6c
+index 000000000..d8ca4437a
 --- /dev/null
 +++ b/patches/pantavisor-031/series
-@@ -0,0 +1,3 @@
+@@ -0,0 +1,4 @@
 +0001-gen_version-allow-overriding-the-version-via-PV_GIT_.patch
 +0002-plugins-pv_lxc-drop-the-unused-pv_export.h-include.patch
 +0003-signature-convert-raw-ECDSA-signatures-to-DER-before.patch
++0004-cmake-link-libevent-before-mbed-TLS.patch
 diff --git a/rules/pantavisor.in b/rules/pantavisor.in
 new file mode 100644
-index 000000000..17b6db860
+index 000000000..60a6a2d86
 --- /dev/null
 +++ b/rules/pantavisor.in
 @@ -0,0 +1,112 @@
@@ -291,7 +336,7 @@ index 000000000..17b6db860
 +	select HOST_CMAKE
 +	select LIBTHTTP
 +	select PICOHTTPPARSER
-+	select MBEDTLS
++	select MBEDTLS36
 +	select LXC
 +	select ZLIB
 +	select LIBEVENT22
@@ -395,10 +440,10 @@ index 000000000..17b6db860
 +endif
 diff --git a/rules/pantavisor.make b/rules/pantavisor.make
 new file mode 100644
-index 000000000..9552c6c9d
+index 000000000..30986a062
 --- /dev/null
 +++ b/rules/pantavisor.make
-@@ -0,0 +1,151 @@
+@@ -0,0 +1,157 @@
 +# -*-makefile-*-
 +#
 +# Copyright (C) 2026 by Fernando Luiz Cola <fernando.luiz@pantacor.com>
@@ -430,16 +475,22 @@ index 000000000..9552c6c9d
 +# Prepare
 +# ----------------------------------------------------------------------------
 +
-+# libevent22's private prefix (LIBEVENT22_PREFIX), spelled out because
-+# rule files are not included in a fixed order. CMAKE_PREFIX_PATH makes
-+# find_library() take its static libs before a libevent 2.1 in /usr/lib.
++# The private prefixes of libevent22 and mbedtls36 (LIBEVENT22_PREFIX,
++# MBEDTLS36_PREFIX), spelled out because rule files are not included in a
++# fixed order. CMAKE_PREFIX_PATH makes find_library() take their static
++# libs before a libevent 2.1 or mbedtls 4 in /usr/lib. The include paths go
++# into CPPFLAGS: CMakeLists.txt passes PANTAVISOR_RUNTIME_MBEDTLS_INCLUDE_DIR,
++# not the _DIRS it finds.
 +PANTAVISOR_LIBEVENT_PREFIX := /usr/lib/libevent-2.2
-+PANTAVISOR_CPPFLAGS	:= -I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_LIBEVENT_PREFIX)/include
++PANTAVISOR_MBEDTLS_PREFIX := /usr/lib/mbedtls-3.6
++PANTAVISOR_CPPFLAGS	:= \
++	-I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_LIBEVENT_PREFIX)/include \
++	-I$(PTXDIST_SYSROOT_TARGET)$(PANTAVISOR_MBEDTLS_PREFIX)/include
 +
 +PANTAVISOR_CONF_TOOL	:= cmake
 +PANTAVISOR_CONF_OPT	:= \
 +	$(CROSS_CMAKE_USR) \
-+	-DCMAKE_PREFIX_PATH=$(PANTAVISOR_LIBEVENT_PREFIX) \
++	-DCMAKE_PREFIX_PATH="$(PANTAVISOR_LIBEVENT_PREFIX);$(PANTAVISOR_MBEDTLS_PREFIX)" \
 +	-DPANTAVISOR_APPENGINE=OFF \
 +	-DPANTAVISOR_CLANG_FORMAT_CHECK=OFF \
 +	-DPANTAVISOR_DCP_BLOB_CREATE=OFF \

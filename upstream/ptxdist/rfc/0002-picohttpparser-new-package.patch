@@ -1,7 +1,7 @@
-From 716433ead33c8e44e17e6920f479aed12d122fe9 Mon Sep 17 00:00:00 2001
+From 087a69a379c2d33a7f727e1e165fccf40b0a79a8 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 15:56:20 -0300
-Subject: [RFC PATCH 1/7] picohttpparser: new package
+Subject: [RFC PATCH 2/8] picohttpparser: new package
 
 picohttpparser is the HTTP request and response parser from h2o.
 Pantavisor uses it. Upstream has no releases, so take the revision

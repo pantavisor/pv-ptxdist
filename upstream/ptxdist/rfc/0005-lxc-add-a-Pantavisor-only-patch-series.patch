@@ -1,7 +1,7 @@
-From aa9f8fe18e8ad84abeecb83a251623bde8f57f00 Mon Sep 17 00:00:00 2001
+From badab2efb907a9c837f397eea36a204165ade777 Mon Sep 17 00:00:00 2001
 From: Fernando Luiz Cola <fernando.luiz@pantacor.com>
 Date: Tue, 24 Nov 2026 17:17:10 -0300
-Subject: [RFC PATCH 4/7] lxc: add a Pantavisor-only patch series
+Subject: [RFC PATCH 5/8] lxc: add a Pantavisor-only patch series
 
 Pantavisor runs its containers with twelve lxc changes from its fork
 (github.com/pantavisor/lxc, stable-6.0), rebased onto 6.0.6:
